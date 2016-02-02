@@ -1,0 +1,45 @@
+ISO images created by most mastering programs can be mounted as a drive
+under DOS using SHSUCDHD.  This format was adopted in the SHSUCD13
+release and has not been subsequently changed.  If you did not use a prior
+version you need not read the remainder of this document.
+
+                             SHSUCD13
+                             May 1996
+
+   Warning! Warning! Warning! Warning! Warning! Warning! Warning! Warning!
+
+The format of the cache images used by the programs in SHSUCD13 differs from
+and is not compatable with the cache images of previous versions of SHSUCD.
+If you do not use cached images this will not affect you because the change
+has no effect on "real drives".
+
+Previous versions did not cache the system area of a CD.  Block zero was
+omitted entirely and blocks 1 thru 15 were zeroed.  Programs in this version
+cache and use the entire volume space including the system area.  Thus
+existing cache images must be converted to the new format before they can
+be used by the programs in this archive.
+
+If you do not want to convert existing images you can still use the updated
+version of SHSUCDX included in this archive.  The programs SHSUSERV, SHSUCDHD
+and CDCACHER all use the new format and cannot be used with old image files.
+
+The conversion consists of appending a 2048 byte block of nulls to the
+beginning of the existing cache image.  This can be done with the DOS copy
+command and the included 2KBLOCK.DAT file.  The command is:
+
+COPY /b 2KBLOCK.DAT + OLD.IMG NEW.IMG
+
+You must have enough disk space to accomodate both the new image and the old
+image while it is being copied.  The old image can be deleted after the
+conversion is completed and verified.  Unfortunately, it takes a while to
+copy a 650 MByte image.
+
+The new format is compatable with the format of the files created by the
+shareware program CD2FILE.  Thus files created with CD2FILE, and perhaps
+others that I do not know about, can now be used with both the SHSUCDHD
+pseudo driver and the SHSUSERV programs.
+
+My apologies for the problems I am caausing by changing the format.  I
+should have changed it long ago.  A request by Olaf Marx
+<omarx@adler.biologie.Uni-Osnabrueck.DE> to make it compatable with the
+CD2FILE format finally prompted me to get on with it.  Thanks Olaf.

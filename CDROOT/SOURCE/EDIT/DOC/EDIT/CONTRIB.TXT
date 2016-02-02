@@ -1,0 +1,41 @@
+The following people have helped with the development of FreeDOS Editor:
+
+Dr. Dobb's Journal: Originally wrote the application, D-Flat, which Edit is
+                    based on.
+
+Shaun Raven:        Fixed many bugs from D-Flat and made it more stable.
+
+Joe Cosentino:      Fixed more bugs, changed the user interface around,
+                    added additional features. Maintainer of EDIT 0.6
+                    and EDIT 0.8 / 0.81 / 0.82 ... series: The 0.6x and
+                    0.7x (x being any letter) series is Eric's spin-off.
+
+Eric Auer:          Fixed many bugs including the file handling bugs and
+                    the AltGr bug. Removed irq handlers (timer, keyboard)
+                    from EDIT (0.6b, 0.6c respectively). Expanding tabs on
+                    load and tabs-as-char mode added (0.6d). Fixed shift-bs
+                    crash and drive selection, removed pTab/sTab (0.6e).
+                    Plain BIOS support for ctrl-ins, alt-backspace in 0.7,
+                    as well as ^P+char handling and time seconds display.
+                    Updates and bugfixes for 0.7a and 0.7b: Fixed tabs-as-
+                    chars loading, introduced viewer mode...
+                    Updates and bugfixes for 0.7c: swapped selection end
+                    handling, cursor range checking, improved "try again"
+                    save dialog, nonblinking clock, ctrl-f and alt-digit
+                    shortcuts (find, go to window 1..9), static window
+                    list order, int 2a.84 idle calls, ASCII table...
+                    Updates for 0.7d: upcase/downcase block, count lines
+                    words and bytes in block.
+
+Jeremy Davis:       Added the Control+Break Handler, added additional video
+                    functions.
+
+Patric Rufflar:     Made EDIT self-contained again by collecting all the
+                    library source files and fixed some bugs (AltGr, 0.6+).
+                    
+Aitor Santamaria:   D-Flat is taken out as standalone libraries, as
+                    FreeDOS D-Flat+, which are compiled and distributed
+                    separatedly as TUI creation libraries.
+                    Some minor bugs fixed.
+                    EDIT 0.9 series, based on DFlat+.
+

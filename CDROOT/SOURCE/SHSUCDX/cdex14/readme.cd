@@ -1,0 +1,219 @@
+Latest Versions as of October 19, 2000
+
+   SHSUSERV Version 3.1
+   SHSUCDN  Version 0.01
+   SHSUCDX  Version 1.4b
+   SHSUDRVX Version 1.1
+   SHSUCDHD Version 4.0
+   CDCACHER Version 5.0
+
+SHSUSERV is a CD-ROM server that allows 48 users simultaneous access to
+         CD-ROMs.  The CDs may be mounted on physical drives or they may
+         be cached images created on a hard disk using the CDCACHER program.
+         Driver names and cache image names may be specified in a server
+         initiation file (SHSUSERV.INI) at start up.
+
+         This version provides a toggle to turn off polling the drives to
+         update the screen display of the the CD volume labels that occurs
+         every 20 seconds.  I am told that this causes cd changers to
+         continuously cycle through the CDs.
+
+         The client/server link uses NETBIOS. The unique server name can be
+         specified on the command line when the server is started.  Client
+         names must also be unique.
+
+         The server program will run in a DOS window under OS/2 Warp 3.  I
+         have run it using native NetBeui, netbios over Novell's OS2-DOS IPX.
+         I have run it using netbios over TCP/IP, but not on an OS2 machine.
+         Remember that the transport protocol must be the same at the client
+         and server. i.e., both ends must be IPX, IP, NetBeui, or whatever.
+         When run in an OS2-DOS window, a CD must be in the drive when the
+         server is started and it cannot be changed. The Pulse program shows
+         100% CPU utilization when the server is run because the server uses
+         polling loops.  Hence, the server does degrade OS/2 performance.  If
+         I ever figure out how to make the 32 bit OS2 NetBios interface work,
+         I hope to complete an interrupt driven OS/2 version of the server.
+
+         The server will run under NT DOS emulation using cached images only.
+         I have been told that, NT's DOS emulation does not provide a CD
+         device driver interface.  I have also seen it run in a window under
+         Win95.
+
+SHSUCDN  is a pseudo CD-ROM driver that runs as a TSR on a client work-
+         station.  It accepts CD-ROM driver request from MSCDEX and
+         transmits them on to the server and returns the server response
+         to MSCDEX.  SHSUCDX may be used in place of MSCDEX.
+
+SHSUCDX  is a CD-ROM redirector substitute for MSCDEX.  It differs from
+         MSCDEX in that it can be un-loaded, it occupies less memory, and
+         only selected drives are mapped.  Version 1.4b also converts
+         lowercase characters to upper case in directory entries.  Lower
+         case characters are invalid but some mastering programs put them in.
+         Local and networked CD-ROMs can be accessed simultaneously using
+         the SHSUSERV/SHSUCDN client/server software or by using SHSUCDHD.
+         A total of 10 drives can be mapped in any order from all available
+         drives on 10 drivers.  See README.CDX
+
+SHSUDRVX is a CD driver/controller emulator which emulates two CD drives
+         loaded with ISO CD ROMS.  It is useful for testing.  It can be
+         loaded multiple times with different driver names to simulate
+         more than 2 drives.  See README.DRV
+
+SHSUCDHD is a pseudo CD-ROM driver that runs as a TSR on a client work-
+         station and makes up to 5 local or remote cd cache images appear as
+         cd drives.  It is known to be compatible with Novell VLM clients and
+         NT clients.  It will not access remote cache files using Novell's
+         NETX shell client.  See README.CDH
+         Images can be created using the Cacher program or any program that can
+         create and ISO disk image.
+
+         Warning!!!!  Attempting to use MSCDEX with SHSUCDHD will crash
+            your system.  SHSUCDX must be used.
+
+CDCACHER is a stand alone program for making a hard disk cache image of a CD
+         ROM for the server.  A full CD can take a while and lots of disk space.
+
+2KBLOCK.DAT is a 2048 byte block of nulls for converting old cache images to
+         the new cache format.  See README.1ST.
+
+KLUDGE0  is a dummy CD driver which makes a specified driver,unit appear as
+         unit 0 on CD0.
+
+Files included in this zip file:
+
+     README.1ST     Warning about change in cache image file format.
+     README.CD      This file.  Client/Server documentation.
+     README.CDX     Documentation for SHSUCDX.
+     README.DRV     Documentation for SHSUDRVX.
+     SHSUSERV.EXE   Server executable.
+     EXAMPLE.INI    Sample server initiation file.
+     SHSUCDN.EXE    Client executable.
+     SHSUCDX.EXE    Redirector executable.
+     SHSUDRVX.EXE   A CD Drive emulator executable.
+     SHSUCDHD.EXE   Cached image driver executable.
+     CDCACHER.EXE   CD cache image creation program executable.
+     KLUDGE0.EXE    Drive unit remap program executable.
+     SHSUCDN.ASM    Client source.
+     NETBIOS.INC    Netbios include file for SHSUCDN.ASM.
+     SHSUCDX.ASM    Redirector source.
+     UNDOC.INC      Include file for SHSUCDX.
+     CDROMS.INC     Include file for SHSUCDX.
+     CMDS.C         Redirector sub-functions.
+     CDROMS.H       Header file for CMDS.
+     REDIR.H        Header file for CMDS.
+     SHSUSERV.ADA   Main server program - ADA83.
+     TYPES.ADS      Common objects package - ADA83.
+     TYPES.ADB
+     NETBIOS.ADS    Netbios package - ADA83.
+     NETBIOS.ADB
+     DRIVERS.ADS    CD driver package - ADA83.
+     DRIVERS.ADB
+     SERVTASK.ADS   Server tasks package - ADA83.
+     SERVTASK.ADB
+     CDROMS.ADS     CDROMS package - ADA83.
+     CDROMS.ADB
+     CDCACHER.C     CD cache image creation program source.
+     SHSUCDHD.ASM   Cached image driver program source.
+     KLUDGE0.ASM    Drive unit remap program source.
+     SHSUDRV0.IMG   Sample cache image files made by caching
+     SHSUDRV1.IMG     the drives created by running SHSUDRVX.
+     2KBLOCK.DAT    2048 byte block of nulls for converting cache images
+
+Loading the server.
+
+    If an initiation file named SHSUSERV.INI is not located in the default
+    directory when the server is started, the server looks for CD-ROM drivers
+    named CD001, CD002, MSCD001, and MSCD002, or file images SHSUDRV0.IMG, and
+    SHSUDRV1.IMG
+
+    If a server initiation file, SHSUSERV.INI is used, any valid driver or
+    file image names (max pathname is 24 characters) may be used.  Names in
+    the file that cannot be located are ignored.  See the example .INI file.
+    This file must be in the default directory (not necessarily the directory
+    where the server or cached images are located) when the server is started.
+    If you are using cached images, you may need to increase DOS's default
+    FILES= value in your CONFIG.SYS file.
+
+    The default driver name in OS2-DOS is MSCD001.  Under PCDOS the driver
+    name is assigned in the config.sys file statement that loads the driver.
+    A typical config.sys command to do this is:
+
+        device=tslcdr.sys /D:CD001
+
+    NetBios must be configured and loaded on the server before starting
+    the server program.  The server itself is configured to handle up to
+    48 users.  Novell's NetBIOS defaults to 12 sessions and 12 outstanding
+    commands.  To make full use of the server you must increase this with
+    entries in the NET.CFG file.
+    The commands
+        NETBIOS COMMANDS=48
+        NETBIOS SESSIONS=48
+    are holdover shell commands and must be left justified and terminated
+    with a return.  The newer command are shown in some NetWare books.
+    Perhaps they will work for you.  The important thing is that if it's
+    configured for 48 commands it will say so when loads.
+
+    Once NetBIOS is loaded, the server can be started.  The syntax for
+    loading SHSUSERV is
+
+      SHSUSERV [/S:ServerName]
+
+    The default network server name is SHSU-CD-SERVER.  Server names cannot
+    exceed 16 characters (no embedded spaces).
+
+Loading the client.
+
+    NetBIOS must be loaded on the client and the CD server started before
+    loading SHSUCDN.  The syntax for loading SHSUCDN is:
+
+      SHSUCDN [/?][/C:ClientName][/S:ServerName][/D:DriverName][/Q][/U]
+
+    The default network client name is CD-CLIENT.  The default Server name
+    is SHSU-CD-SERVER.  The default Driver Name is SHSU-CDN.  The client
+    network name must be unique and the /C: parameter is used for this purpose.
+
+    A typical sequence to load SHSUCDN and MSCDEX on the workstation will
+    look something like (case in not important):
+
+        SHSUCDN /C:Monique
+        MSCDEX  /D:SHSU-CDN
+
+    Additional drivers can be included on the MSCDEX command line.  Prior to
+    loading MSCDEX, SHSUCDN can be unloaded with the /U switch.  Unfortunately,
+    MSCDEX is not unloadable and it is best to not unload SHSUCDN after MSCDEX
+    is loaded.
+
+    To unload SHSUCDN the driver name must be included on the command line if
+    the default name was not used when it was loaded.  i.e., if you loaded
+    SHSUCDN  with the command line
+
+        SHSUCDN /C:Monique /D:CD001
+
+    use the command line
+
+        SHSUCDN /D:CD001 /U
+
+    to unload it.
+
+    SHSUCDX can be loaded after SHSUCDN instead of MSCDEX.  It is unloadable
+    and can be unloaded using the /U switch before unloading SHSUCDN.  For more
+    information on SHSUCDX see the accompanying README.CDX file.
+
+    Some DOS programs bypass MSCDEX and access the CD driver directly.  The
+    installation program for one widely used reference engine uses MSCDEX to
+    install and to locate the CD driver.  After installation, however, the
+    driver is accessed directly by name and MSCDEX is bypassed(it doesn't even
+    have to be loaded).  Further, the program expects the CD to be on unit 0.
+
+    KLUDGE0 is a fix for this problem.  For instance, if the CD is on unit 7
+    of MSCD001, executing KLUDGE0 /D:MSCD001,7 will make it appear as unit 0
+    on a driver named CD0.  This can then be mapped to a drive letter with the
+    MSCDEX parameter /D:CD0.
+
+SHSUSERV, SHSUCDN, SHSUCDX, SHSUDRVX, SHSUCDHD and CDCACHER are copyright
+ reserved, free use programs.  Use at your own risk.
+
+Time permitting, an attempt will be made to fix problems that are reported
+ to CSC_JHM@SHSU.EDU.
+
+(c)John H. McCoy, 1994, 1995, 1996 Sam Houston St. Univ., TX 77341-2206

@@ -1,0 +1,2465 @@
+;
+;****************************************************************************
+;
+; SHSURDRV Version 1.00
+; Jason Hood, December 2004 & June 2005.
+; jadoxa@yahoo.com.au
+; http://shsufdrv.adoxa.cjb.net/
+;
+; v1.10, October 2005.
+; v1.11, December 2005.
+;
+; A driver for floppy and hard disk images, as well as RAM drives.
+;
+; Acknowledgements to:
+;   * Ralf Brown's Interrupt List;
+;   * Jim Kyle for DEVLOD.C;
+;   * John H. McCoy for SHSUCDX/SHSUCDHD and an initial version of this.
+;
+; Todo (maybe):
+;   * recognise other hard disk partitions
+;   * forego XMS3 functions (blocks >=64Mi not liked after starting Windows)
+;   * dynamically resize RAM drives
+;   * write drive back to file
+;   * (option to) zero memory for partial images or RAM drives
+;
+;****************************************************************************
+;
+
+;%define i8086		; If defined no 386 instructions will be used.
+%define GUNZIP		; If defined gzipped images can be read.
+;%define STGY		; If not defined intr assumes ES:BX has request header.
+
+;%define FORMAT 	; If defined drives can be formatted and VSN set.
+; Notes: MS-DOS FORMAT prompts for disk (uses disk type, not removable flag);
+;	 FreeDOS FORMAT updates the VSN directly, so GetVSN still returns old.
+
+
+%include "nasm.mac"
+
+%ifdef i8086
+	cpu	286	; 286 minimum for XMS
+%else
+	cpu	386
+%endif
+
+struc rh
+  .Length		resb	1	; header size in bytes
+  .Unit 		resb	1	; drive unit mumber
+  .Command		resb	1	; device command code
+  .Status		resw	1	; device command status
+  .Reserved		resb	8
+endstruc
+
+struc rhIOCTL
+			resb	rh_size ; RH common
+  .Category		resb	1
+  .Command		resb	1
+  .stuff		resw	2
+  .ParBlock		resd	1	; pointer to IOCTL parameter block
+endstruc
+
+struc rhMediaCk
+			resb	rh_size ; RH common
+  .MediaDesc		resb	1
+  .MediaStatus		resw	1
+  .VolNamePtr		resd	1
+endstruc
+
+struc rhBuildBPB
+			resb	rh_size ; RH common
+  .MediaDesc		resb	1
+  .FATPtr		resd	1
+  .BPBPtr		resd	1
+endstruc
+
+struc rhRead
+			resb	rh_size ; RH common
+  .MediaDesc		resb	1
+  .XfrAddr		resd	1
+  .SectorCount		resw	1
+  .StartSector		resw	1	; if 0FFFFh use StartSector32
+  .VolID		resd	1
+  .StartSector32	resd	1
+endstruc
+
+rhcmdMediaCheck 	equ	01h
+rhcmdBuildBPB		equ	02h
+rhcmdRead		equ	04h
+rhcmdWrite		equ	08h
+rhcmdWriteVerify	equ	09h
+rhcmdIOCTL		equ	13h
+rhcmdIOCTLCheck 	equ	19h
+
+iocmdSetParm		equ	40h	; set device parameters
+iocmdFormat		equ	42h
+iocmdSetVSN		equ	46h	; set volume serial number
+iocmdGetParm		equ	60h
+iocmdVerifyTrack	equ	62h
+iocmdGetVSN		equ	66h
+iocmdGetAccess		equ	67h
+
+MediaChanged_No 	equ	 1
+MediaChanged_Yes	equ	-1
+MediaChanged_DontKnow	equ	 0
+
+DeviceError		equ	8000h
+DeviceDone		equ	0100h
+DE_UnknownUnit		equ	  01h	; OR these with DeviceError
+DE_DeviceNotReady	equ	  02h
+DE_UnknownCommand	equ	  03h
+DE_SectorNotFound	equ	  08h
+DE_WriteError		equ	  0Ah
+DE_ReadError		equ	  0Bh
+DE_GeneralFailure	equ	  0Ch
+
+; Current Directory Structure
+struc CDS
+  .CurrPath		resb	67
+  .Flags		resw	 1
+  .DPB			resd	 1
+  .CurDir		resw	 1
+  .FFFF 		resd	 1
+  .RootOff		resw	 1
+  .Type 		resb	 1
+  .IFSRedir		resd	 1
+  .Avail		resw	 1
+endstruc
+
+; BIOS Parameter Block
+struc BPB
+  .BytesPerSector	resw	1
+  .ClusterSize		resb	1
+  .NumReservedSectors	resw	1
+  .NumCopiesOfFat	resb	1
+  .MaxNumRootDirEntries resw	1
+  .TotalNumSectors	resw	1	; if zero use BigTotalNumSectors
+  .MediaDesc		resb	1
+  .NumSectorsPerFat	resw	1
+  .NumSectorsPerTrack	resw	1
+  .NumHeads		resw	1
+  .NumHiddenSectors	resd	1
+  .BigTotalNumSectors	resd	1
+  ;.Unknown		resb	6	; this is what RBIL says is in the BPB
+  ;.NumCylinders	resw	1
+  ;.DeviceType		resb	1
+  ;.DeviceAttr		resw	1
+  .DeviceType		resw	1	; this is what's on the drive
+  .ExtBootSig		resb	1
+  .VSN			resd	1
+  .VolLabel		resb	11
+  .FSType		resb	8
+endstruc
+
+; Drive Parameter Block
+struc DPB
+  .DriveNumber		resb	1
+  .UnitNumber		resb	1
+  .BytesPerSector	resw	1
+  .HighestSector	resb	1	; sectors per cluster - 1
+  .SectorShift		resb	1
+  .ReservedSectors	resw	1
+  .NumFats		resb	1
+  .RootEntries		resw	1
+  .UserSector		resw	1
+  .HighestCluster	resw	1
+  .SectorsPerFAT	resw	1
+  .RootSector		resw	1
+  .Device		resd	1
+  .MediaID		resb	1
+  .Accessed		resb	1
+  .NextDPB		resd	1
+  .StartCluster 	resw	1	; start search for free cluster
+  .FreeClusters 	resw	1
+endstruc
+
+SectorSize		equ	512	; make it an EQU so we don't change it
+SectorShift		equ	9
+
+
+struc DriveEntry
+  .BPB			resb	BPB_size	; expected first
+  .DPB			resb	DPB_size
+  .Handle		resw	1
+endstruc
+
+
+segment _TEXT class=CODE
+segment _DATA class=DATA
+segment _BSS class=BSS align=16
+
+group DGROUP _TEXT _DATA _BSS
+
+segment _TEXT
+
+
+; DOS device header
+; DO NOT MAKE THE DEVICE DRIVER NAME THE SAME AS THE FILE NAME
+
+RDRVHdr
+  NextDriver	dd	-1
+  Attributes	dw	08c2h		; generic IOCtl, 32-bit sectors
+		dw	Strategy
+		dw	Interrupt
+  Units 	db	0		; number of drives on this device
+  DeviceName	db	'SHSU-RD'
+
+
+%ifdef STGY
+rhAddr		dd	0
+%endif
+
+EMM
+  bytes 	dd	0		; must be even
+  srch		dw	0		; source handle
+  srco		dw	0, _BSS 	;	 offset
+  dsth		dw	0		; destination
+  dsto		dd	0
+
+
+; Use BP to access variables, since it's shorter than direct memory access
+; (one byte for displacement, instead of two bytes for address).
+%define BP_(var) bp+var-RDRVHdr
+
+; Error routine can be in two locations, depending on FORMAT.
+%macro rhError 0
+.err:	mov	al, DE_UnknownCommand
+	db	0b9h			; MOV CX, nnnn
+.unk:	mov	al, DE_UnknownUnit
+	jmp	.erxit
+%endmacro
+
+
+%ifdef STGY
+;************************************************************************
+;* Driver Strategy routine
+;************************************************************************
+
+Strategy
+	; ES:BX contains request header pointer, save it.
+	ses	bx, cs:rhAddr
+	retf
+%endif
+
+
+;************************************************************************
+;* Driver Interrupt routine
+;************************************************************************
+
+Interrupt
+	pushf
+	pusha
+%ifdef i8086
+	save	ds,es
+%else
+	save	ds,es,eax
+%endif
+	cld
+
+%ifdef FORMAT
+	zero	bp ; = RDRVHdr
+%endif
+
+%ifdef STGY
+ %ifdef FORMAT
+	lds	bx, [cs:BP_(rhAddr)]	; make sure we have RH addr
+ %else
+	lds	bx, [cs:rhAddr]
+ %endif
+%else
+	ld	ds, es			; assume ES:BX still has it
+%endif
+	mov	al, [bx+rh.Unit]
+	cmp	al, i(iUnits)
+iUnits ib
+	jae	.unk
+	cbw
+	imul	si, ax, DriveEntry_size
+	add	si, Drive
+
+	mov	al, [bx+rh.Command]
+	mov	cx, [cs:si+DriveEntry.Handle]
+
+	if al ,e, rhcmdIOCTL
+	 les	di, [bx+rhIOCTL.ParBlock]
+%ifdef FORMAT
+	 mov	al, [bx+rhIOCTL.Command]
+	 push	ds
+	 ld	ds, cs
+	 if al ,e, iocmdGetVSN
+%else
+	 ifb [bx+rhIOCTL.Command] ,e, iocmdGetVSN
+	  push	ds
+	   ld	ds, cs
+%endif
+	   add	si, BPB.VSN
+	   scasw			; skip info
+	   mov	cx, 23
+.dnmv:	   rep	movsb
+.dnds:	  pop	ds
+	  jmp	.dn
+	 fi
+%ifndef FORMAT
+	 rhError
+	fi
+%else
+	 if al ,e, iocmdSetVSN
+	  swap	ds, es
+	  save	cx
+	  add	si, BPB.VSN-1		; back up one to make it even
+	  sthl	cs,si, cs:BP_(srco)
+	  inc	si
+	  scasw 			; skip info
+	  xchg	si, di
+	  mov	cx, 24
+	  mov	[cs:BP_(bytes)], cx
+	  dec	cx
+	  rep	movsb
+	  ld	ds, cs
+	  mov	si, dsth
+	  mov	[si-dsth+srch], cx
+%ifdef i8086
+	  xchg	ax, cx
+	  mov	dx, hl(11+BPB.VSN-1,0)
+%else
+	  zero	eax
+	  mov	al, 11+BPB.VSN-1
+%endif
+	  restore
+	  call	xmsmv
+	  jmp	.dnds
+	 fi
+
+	 jif	al ,e, iocmdGetParm, .gp
+
+	 pop	ds
+	 sub	al, iocmdFormat
+	 if ne
+	  sub	al, iocmdVerifyTrack - iocmdFormat
+	  if ne
+	   jif	al ,ne, iocmdGetAccess - iocmdVerifyTrack, .err
+	   inc	di
+	  fi
+	 fi
+	 stosb				; supported by BIOS / access allowed
+	 jmp	.dn
+	fi
+
+	if al ,e, rhcmdIOCTLCheck
+	 jifb	[bx+rhIOCTL.Command] ,e, iocmdSetVSN, .dn
+
+	 rhError
+
+.gp:	 mov	ax, hl(7,5)		; other type, use current BPB,
+	 stosw				;	      same size sectors
+	 mov	ax, 1			; nonremovable media
+	 stosw
+	 stosw				; 1 cylinder seems fine
+	 dec	ax			; media type other
+	 stosb
+	 mov	cx, BPB.DeviceType
+	 jmp	.dnmv
+	fi
+%endif
+
+	; Scandisk will test the FAT media byte if the disk is not removable,
+	; so say we are to avoid modifying that byte (from F0 to F8).
+	;if al ,e, 0fh ;rhcmdRemovable
+	; mov	ah, 2			; busy = not removable
+	; jmp	.ddone
+	;fi
+
+	if al ,e, rhcmdMediaCheck
+	 mov	[bx+rhMediaCk.MediaStatus], al ;MediaChanged_No
+	 jmp	.ddone
+	fi
+
+	if al ,e, rhcmdBuildBPB
+	 scs	si, bx+rhBuildBPB.BPBPtr
+.dn:	 jmp	.ddone
+	fi
+
+	mov	si, srch
+	mov	di, dsth
+	if al ,ne, rhcmdRead
+	 sub	al, rhcmdWrite
+	 cmp	al, 1 ;rhcmdWriteVerify
+	 ja	.err
+	 xchg	si, di
+	fi
+	; Limit read/write to 63.5Ki.
+	mov	ax, [bx+rhRead.SectorCount]
+	if ax ,a, 127
+	 mov	ax, 127
+	 mov	[bx+rhRead.SectorCount], ax
+	fi
+	shl	ax, SectorShift
+	jz	.ddone
+	mov	[cs:bytes], ax
+	save	ds
+	 call	ReadImage
+	restore
+	if nz
+	 zerow	[bx+rhRead.SectorCount]
+.erxit:  mov	ah, DeviceError >> 8
+	fi
+
+.ddone: or	ax, DeviceDone
+	mov	[bx+rh.Status], ax
+
+	restore
+	popa
+	popf
+%ifndef STGY
+Strategy
+%endif
+	retf
+
+
+;+
+; FUNCTION : ReadImage
+;
+;	Read/write the sectors from/to XMS.
+;
+; Parameters:
+;	BX -> request header
+;	CX := XMS handle
+;	SI -> source (in EMM)
+;	DI -> destination (in EMM)
+;
+; Returns:
+;	AL := 0 for all bytes read (and ZR)
+;	      device error code otherwise (and NZ)
+;
+; Destroys:
+;
+;-
+ReadImage
+	mmovd	cs:di+2, bx+rhRead.XfrAddr
+	ldd	bx+rhRead.StartSector32
+	ld	ds, cs
+	zerow	[di]
+%ifdef i8086
+	shl	ax, 1
+	rcl	dx, 1
+xmsmv:
+	mov	[si+2],   dh		; should be zero
+	mov	[si+2+1], ax
+	mov	[si+2+3], dl
+%else
+	shl	eax, SectorShift
+xmsmv:
+	mov	[si+2], eax
+%endif
+	mov	[si], cx
+	mov	si, EMM
+	mov	ah, 0bh
+	icallf	xms
+	ibit	al, 0			; 0 -> 1 failed, 1 -> 0 succeeded
+	shl	al, 3			; DE_SectorNotFound
+	ret
+
+
+Drive	; overwrites the help screen
+
+
+;============================================================================
+;  everything below this line is discarded after installing the driver
+
+CopyrightMsg
+dln "SHSURDRV by Jason Hood <jadoxa@yahoo.com.au>."
+dln "Version 1.11 (21 December, 2005).  Freeware."
+dln "http://shsufdrv.adoxa.cjb.net/"
+dlz
+
+HelpMsg
+dln "Simulate a floppy or hard disk using an image file in memory"
+dln "and/or create a RAM drive."
+dln
+dln "SHSURDRV [/F[?][image][,drive]]... [/R[mem]] [/T] [/C] [/V] [/U] [/Q[Q]]"
+dln "         [/D[size][Ssectors][Ccluster][Dentries][Ffats][$[label],][drive]]..."
+dln
+dln "   image     Filename of raw disk image ('?' will ignore an invalid image)"
+dln "             or letter and colon to mirror a (floppy) drive (default is A:)."
+%ifdef GUNZIP
+dln "             The image may have been compressed with gzip."
+%endif
+dln "   drive     Drive letter to use (default is first available)."
+dln "   size      Create a new drive with this much free space, in bytes;"
+dln "             suffix with 'K' for kibibytes or 'M' for mebibytes."
+dln "   sectors   Use exact number of sectors as size (default is 4101)."
+dln "   cluster   Cluster size to use, in kibibytes (default is 4096 bytes)."
+dln "   entries   Number of root directory entries (default is 64)."
+dln "   fats      Number of File Allocation Tables (default is 1, max. of 2)."
+dln '   label     The volume label (default is "SHSURDRV").'
+dln "   /R        Reserve mem kibibytes of XMS (default is 4)."
+dln "   /T        Allocate at the top of XMS."
+dln "   /C        Use conventional memory instead of loading high."
+dln "   /V        Display memory usage (only at install)."
+dln "   /U        Unload."
+dln "   /Q        Quiet - don't display sign-on banner."
+dln "   /QQ       Really quiet - don't display anything."
+dln
+dln "Notes:"
+dln "  * A colon (':') can be used to separate an option from its value."
+dln "  * Using /F and /D is optional; if the first character is a digit /D will"
+dln "    be assumed, otherwise /F."
+dln "  * Options to /D may be separated by commas and appear in any order, but"
+dln "    size, if present, must be first."
+dln '  * Size can be a predefined value - use "/?S" to see what is available.'
+dln "  * Cluster must be a power of 2 (ie. 0, 1, 2, 4, 8, 16, 32 or 64); any"
+dln "    other value will be rounded up to the next, but no higher than 64."
+dln "  * Size will be rounded up to a multiple of the cluster size."
+dln "  * Entries will be rounded up to a multiple of 16."
+%ifdef i8086
+dln "  * Using more than 14MiB of XMS requires /R or /T to start Windows."
+%else
+dln "  * Using more than 14MiB of XMS requires /R or /T to start Windows, which"
+dln "    also doesn't like individual drives greater than 64MiB."
+%endif
+dln "  * No drive letter will be assigned lower than the first."
+dln "      Eg: /F:img1,E /F:img2,D will assign to E: and F:, *not* E: and D:."
+dln "  * Only the drive (on the first partition of a hard disk) is simulated,"
+dln "    not the disk itself, and only a 512-byte sector size."
+dln
+dln "ERRORLEVEL is set to:"
+dln "  * the first drive assigned (A: = 1) on successful install;"
+dln "  * 0 on successful uninstall or this help is displayed;"
+dlz "  * 255 if not able to (un)install."
+
+SizeMsg
+dln "Use one of the following values for size to create a floppy format:"
+dln
+dln " 160    5.25 SS, 40 tracks,  8 sectors per track"
+dln " 180    5.25 SS, 40 tracks,  9 sectors per track"
+dln " 200    5.25 SS, 40 tracks, 10 sectors per track"
+dln " 205    5.25 SS, 41 tracks, 10 sectors per track"
+dln " 320    5.25 DS, 40 tracks,  8 sectors per track"
+dln " 360    5.25 DS, 40 tracks,  9 sectors per track"
+dln " 400    5.25 DS, 40 tracks, 10 sectors per track"
+dln " 410    5.25 DS, 41 tracks, 10 sectors per track"
+dln " 720    3.5  LD, 80 tracks,  9 sectors per track"
+dln " 800    3.5  LD, 80 tracks, 10 sectors per track"
+dln " 820    3.5  LD, 82 tracks, 10 sectors per track"
+dln "1200    5.25 HD, 80 tracks, 15 sectors per track (FDFormat 12 or 120)"
+dln "1440    3.5  HD, 80 tracks, 18 sectors per track (FDFormat 14 or 144)"
+dln "1476    3.5  HD, 82 tracks, 18 sectors per track (FDFormat 148)"
+dln "1494    5.25 HD, 83 tracks, 18 sectors per track"
+dln "1600    3.5  HD, 80 tracks, 20 sectors per track (FDFormat 16)"
+dln "1640    3.5  HD, 82 tracks, 20 sectors per track (FDFormat 164)"
+dln "1680    3.5  HD, 80 tracks, 21 sectors per track (FDFormat 168)"
+dln "1722    3.5  HD, 82 tracks, 21 sectors per track (FDFormat 172)"
+dln "1743    3.5  HD, 83 tracks, 21 sectors per track"
+dln "2880    3.5  ED, 80 tracks, 36 sectors per track"
+dln "3360    3.5  ED, 80 tracks, 42 sectors per track"
+dlz "3486    3.5  ED, 83 tracks, 42 sectors per track"
+
+%define ln 13,10
+%define ht 9
+
+%ifdef i8086
+WrongCPUMsg		dlz "Must have at least a 286."
+%else
+WrongCPUMsg		dlz "Must have at least a 386."
+WrongXMSMsg		dlz "Must have XMS v3."
+%endif
+WrongDOSMsg		dlz "Must be DOS 4 or later."
+NoXMSMsg		dlz "XMS driver not found."
+
+InstallMsg		dlz ln,"SHSURDRV image driver installed."
+UnInstallMsg		dlz ln,"SHSURDRV uninstalled and memory freed."
+CouldNotRemoveMsg	dlz ln,"SHSURDRV can't uninstall."
+NotInstalledMsg 	dlz ln,"SHSURDRV not installed."
+FileNotFoundMsg 	dlz ht,": failed to open"
+InvalidImageFileMsg	dlz ht,": unrecognized image"
+ImageTooBigMsg		dlz ht,": too big for memory"
+NoDrivesAvailMsg	dlz ht,": out of drive letters"
+DriveMsg		db  ht,": Drive A"
+DriveLetter		ib
+CRLF			dlz
+
+MemoryUsage		dln
+			dz  "Memory Usage"
+MemoryHigh		dlz		" (loaded high)"
+MemoryBytes		db  "  Static:  "
+MemoryStatic		dln	       "00000 bytes"
+			db  "  Dynamic: "
+MemoryDynamic		dln	       "00000 bytes"
+			db  "  Total:   "
+MemoryTotal		dln	       "00000 bytes"
+			db  "  XMS:     "
+MemoryXMS		dlz	       "00000 kibibytes"
+
+
+BootSect	; 2MiB drive as default
+		db	0ebh, 0feh, 90h ; JMP $-2, NOP
+		db	"RDRV1.11"      ; OEM name
+		dw	512		; bytes per sector
+		db	8		; sectors per cluster
+		dw	1		; reserved sectors
+		db	1		; copies of FAT
+		dw	64		; root directory entries
+		dw	4101		; total sectors
+		db	0f8h		; media descriptor
+		dw	12		; sectors per FAT
+		dw	8		; sectors per track
+		dw	1		; heads
+		dd	0		; hidden sectors
+		dd	4101		; big total sectors
+		dw	0		; device type
+		db	29h		; extended boot signature
+		dd	0		; volume serial number
+		db	"SHSURDRV   "   ; volume label
+		db	"FAT12   "      ; file system type
+
+; List of predefined floppy formats.
+; Values taken from FreeDOS Format by Brian E. Reifsnyder & Eric Auer
+; and FDFormat by Christoph H. Hochst„tter
+
+%macro df 4.nolist
+		db	%1		; sectors per cluster
+		db	%2		; root directory entries
+		dw	%3		; total sectors
+		;db	%4		; media descriptor
+		db	%4		; sectors per track
+%endmacro
+
+FlopSize	equ	5
+
+FlopTable
+		df	1,  64,  320,  8	; FD160  5.25 SS 40, 0xfe
+		df	1,  64,  360,  9	; FD180  5.25 SS 40, 0xfc
+		df	1,  64,  400, 10	; FD200  5.25 SS 40, 0xfc
+		df	1,  64,  410, 10	; FD205  5.25 SS 41, 0xfc
+		df	2, 112,  640,  8	; FD320  5.25 DS 40, 0xff
+		df	2, 112,  720,  9	; FD360  5.25 DS 40, 0xfd
+		df	2, 112,  800, 10	; FD400  5.25 DS 40, 0xfd
+		df	2, 112,  820, 10	; FD410  5.25 DS 41, 0xfd
+		df	2, 112, 1440,  9	; FD720  3.5  LD 80, 0xf9
+		df	2, 112, 1600, 10	; FD800  3.5  LD 80, 0xf9
+		df	2, 112, 1640, 10	; FD820  3.5  LD 82, 0xf9
+		df	1, 224, 2400, 15	; FD1200 5.25 HD 80, 0xf9
+		df	1, 224, 2880, 18	; FD1440 3.5  HD 80, 0xf0
+		df	1, 224, 2952, 18	; FD1476 3.5  HD 82, 0xf0
+		df	1, 224, 2988, 18	; FD1494 5.25 HD 83, 0xf9
+		df	1, 224, 3200, 20	; FD1600 3.5  HD 80, 0xf0
+		df	1, 224, 3280, 20	; FD1640 3.5  HD 82, 0xf0
+		df	1, 224, 3360, 21	; FD1680 3.5  HD 80, 0xf0
+		df	1, 224, 3444, 21	; FD1722 3.5  HD 82, 0xf0
+		df	1, 224, 3486, 21	; FD1743 3.5  HD 83, 0xf0
+		df	2, 240, 5760, 36	; FD2880 3.5  ED 80, 0xf0
+		df	2, 240, 6720, 42	; FD3360 3.5  ED 80, 0xf0
+		df	2, 240, 6972, 42	; FD3486 3.5  ED 83, 0xf0
+FlopTableEnd:
+
+
+VolEntry				; directory entry for the volume label
+		db	8		; volume label attribute
+		times 10 db 0		; reserved/additional file times
+Vtime		dw	0
+Vdate		dw	0
+		dw	0		; cluster
+		dd	0		; size
+
+DOffset 	dw	Drive
+XMSsize 	dd	0
+XMSrsrv 	dw	0
+XMSfree 	dd	0
+XMStop		dw	0
+LoDrive 	db	0ffh		; lowest assigned drive letter
+
+Quiet		dflg	off
+Silent		dflg	off
+Verbose 	dflg	off
+Ignore		dflg	off
+Reloc		dflg	on
+Mirror		dflg	off
+
+Progress	dz	8,8,8, "000"    ; let's assume < 1000MiB
+
+%ifdef GUNZIP
+  %define	BUFSIZE 8192
+  %define	Mi	128
+  extern	_gz_open, _gz_read, _gz_close
+%else
+  %define	BUFSIZE 32768
+  %define	Mi	32
+%endif
+
+segment _BSS
+buf		resb	BUFSIZE 	; buffer expected at XXXX:0000
+DPBChain	resd	1
+LoL		resd	1		; List of Lists
+CDSbase 	resd	1		; First drive position
+PSP		resw	1
+ResSeg		resw	1
+imgsize 	resd	1
+HiDrive 	resb	1		; \ number of block units
+NumDrives	resb	1		; / lastdrive
+type		resb	1		; image or RAM drive
+freespc 	resb	1		; on is free space, off is sectors
+
+%define BootBPB buf+11			; offset of BPB in boot sector
+%define BufSectors BUFSIZE / SectorSize ; number of sectors the buffer can hold
+
+segment _TEXT
+
+
+;+
+; FUNCTION : MsgOut
+;
+;	Output a NUL-terminated string.
+;
+; Parameters:
+;	SI -> message
+;
+; Returns:
+;	Nothing.
+;
+; Destroys:
+;	AX,DL,SI
+;-
+MsgOut
+	retif	[Silent]
+	mov	ah, 02h 		; display ch function
+	when
+	 prch.	al
+	while
+	 lodsb
+	is al nzr
+	return
+
+%macro Output 0-1.nolist
+  %if %0 == 1
+	mov	si, %1
+  %endif
+	call	MsgOut
+%endmacro
+
+
+Dont:	mov	si, NotInstalledMsg
+Xit:	Output
+	exit	255
+RC	equ	$-4
+
+
+;+
+; FUNCTION : Entry point
+;-
+..start
+	mov	ax, cs
+	mov	ds, ax
+	mov	ss, ax
+	mov	sp, stacktop wrt DGROUP
+	mov	[PSP], es
+	cld
+
+	; check processor. Based on code by Henrik Haftmann.
+	cpu	8086
+	mov	si, WrongCPUMsg
+	push	sp			; Check for 80286
+	pop	ax
+	jif	ax ,ne, sp, Xit
+%ifdef i8086
+	cpu	286
+%else
+	pushf				; Now check for 386
+	pop	ax
+	or	ax, 7000h
+	push	ax
+	popf
+	pushf
+	pop	ax
+	jif	ax ,&!, 7000h, Xit
+	cpu	386
+%endif
+
+	mov	al, '?'                 ; /? help
+	call	FindOpt
+	if nc
+	 mov	al, [es:di]
+	 cbit	al, 5
+	 mov	si, SizeMsg
+	 if al ,ne, 'S'
+	  Output CopyrightMsg
+	  mov	si, HelpMsg
+	 fi
+	 mov	[RC], ch		; CH zero from command line length
+	 jmp	Xit
+	fi
+
+	; get DOS version
+	mov	si, WrongDOSMsg
+	dos	30h
+	jif	al ,b, 4, Xit
+
+	; get the XMS driver address
+	mov	si, NoXMSMsg
+	mov	bx, -1
+	mpx	4310h
+	inc	bx
+	jz	Xit
+	dec	bx
+	sthl	es,bx, xms
+
+%ifndef i8086
+	; check for v3
+	mov	ah, 0
+	call	far [xms]
+	mov	si, WrongXMSMsg
+	jif	ah ,b, 3, Xit
+%endif
+
+	call	Initialise
+
+	mov	al, 'Q'                 ; /Q quiet/silent
+	call	FindOpt
+	if nc
+	 sflg.	[Quiet]
+	 mov	al, [es:di]
+	 cbit	al, 5
+	 if. {al ,e, 'Q'}, sflg. [Silent]
+	fi
+
+	mov	al, 'U'                 ; /U uninstall driver
+	call	FindOpt
+	jnc	UnInstall
+
+	mov	al, 'C'                 ; /C "conventional" memory
+	call	FindOpt
+	if. nc, cflg. [Reloc]
+
+	mov	al, 'V'                 ; /V display memory usage
+	call	FindOpt
+	if. nc, sflg. [Verbose]
+
+	mov	al, 'R'                 ; /R reserve memory
+	call	FindOpt
+	if nc
+	 call	atoi
+	 if {ax ,b, 4} AND {dx zr}	; 4 is minimum
+	  mov	al, 4
+	 fi
+%ifdef i8086
+	 xchg	dx, ax
+	 mov	ah, 9
+%else
+	 ld	edx, dx,ax
+	 mov	ah, 89h
+%endif
+	 call	far [xms]
+	 dec	ax
+	 cmov z, [XMSrsrv], dx
+	fi
+
+	mov	al, 'T'                 ; /T top of memory
+	call	FindOpt
+	if nc
+%ifdef i8086
+	 mov	ah, 8			; query free
+	 call	far [xms]
+	 mov	[XMSfree], ax
+	 xchg	dx, ax
+	 mov	ah, 9			; allocate it all
+%else
+	 mov	ah, 88h
+	 call	far [xms]
+	 mov	[XMSfree], eax
+	 xchg	edx, eax
+	 mov	ah, 89h
+%endif
+	 call	far [xms]
+	 mov	[XMStop], dx		; assume successful
+	fi
+
+	ifnflg	[Quiet], \
+	 Output CopyrightMsg
+
+	mov	di, 81h 		; command line
+	movzx.	cx, [es:di-1]		; byte before it is its length
+	while
+	 call	FindImage		; /F[:filename] or /D[:size...]
+	is nc
+	 mov	[type], al
+	 if al ,e, 'F'
+	  call	MoveName
+	 else
+	  call	MakeBPB
+	 fi
+	 if {al ,be, [DriveLetter]} OR {al ,ae, 'A'+32}
+	  mov	al, [DriveLetter]
+	  inc	ax
+	 fi
+	 sub	al, 'A'
+	 mov	[DriveLetter], al
+
+	 save	es,di,cx
+
+	 ifb [type] ,e, 'F'
+	  call	OpenFile
+	  jc	.noimg
+	  jne	.cls
+	 fi
+
+	 mov	cl, [DriveLetter]
+	 call	FindAvailDrive
+	 mov	si, NoDrivesAvailMsg
+	 jc	.noimg
+
+	 ld	es, ds
+	 mov	di, [DOffset]		; DriveEntry.BPB
+	 mov	ch, [Units]
+	 mov	[di+DriveEntry.DPB+DPB.DriveNumber], cx ; DPB.UnitNumber
+	 add	cl, 'A'
+	 mov	[DriveLetter], cl
+	 mov	si, BootBPB
+	 mov	cx, BPB_size
+	 save	di
+	  rep	movsb
+	 restore
+	 movb	[di+BPB.MediaDesc], 0f8h
+
+	 zero	ax
+	 cwd
+	 add	ax, [di+BPB.TotalNumSectors]
+	 if. z, \
+	  ldhl	dx,ax, di+BPB.BigTotalNumSectors
+	 sthl	dx,ax, imgsize
+	 shl	ax, 1			; convert sectors to bytes
+	 rcl	dx, 1			; multiply by 512:
+	 mov	dh, dl			;  double, then simply move
+	 mov	dl, ah			;  bytes to multiply by 256
+	 shl	ax, 8
+	 ifnflg [Mirror], \
+	  sthl	dx,ax, imgsize
+	 mov	si, ImageTooBigMsg
+%ifdef i8086
+	 if dh ,b, 4			; only less than 64Mi allowed
+	  add	ax, 1023		; ensure file is multiple of 1Ki
+	  adc	dx, 0
+	  shr	dx, 1			; bytes to Ki
+	  rcr	ax, 1
+	  shr	dx, 1
+	  rcr	ax, 1
+	  mov	dh, dl
+	  mov	dl, ah
+	  push	0
+	  push	dx
+	  save	bx
+	  ifnzw [XMStop]
+	  save	dx
+	   mov	bx, [XMSfree]
+	   sub	bx, dx
+	   mov	[XMSfree], bx		; potential problem, but let's
+	   mov	dx, [XMStop]		;  assume it'll work
+	   mov	ah, 0fh 		; reallocate
+	   call far [xms]
+	  restore
+	  fi
+	  mov	ah, 9			; allocate XM
+%else
+	 ld	edx, dx,ax
+	 add	edx, 1023
+	 shr	edx, 10
+	 push	edx
+	 save	bx
+	 ifnzw	[XMStop]
+	 save	edx
+	  mov	ebx, [XMSfree]
+	  sub	ebx, edx
+	  mov	[XMSfree], ebx
+	  mov	dx, [XMStop]
+	  mov	ah, 8fh
+	  call	far [xms]
+	 restore
+	 fi
+	 mov	ah, 89h
+%endif
+	 call	far [xms]
+	 restore
+	 dec	ax
+	 pop	cx
+	 pop	ax
+%ifdef i8086
+	 andif z
+%else
+	 if z
+%endif
+	  add	[XMSsize],   cx
+	  adc	[XMSsize+2], ax
+	  mov	[di+DriveEntry.Handle], dx
+	  mov	si, EMM
+	  zero	ax
+	  mov	[si-EMM+dsth], dx
+	  mov	[si-EMM+dsto], ax	; reset destination offset
+	  mov	[si-EMM+dsto+2], ax
+	  mov	[si-EMM+srco], ax	; reset source offset
+	  ifb [type] ,e, 'F'
+	   call CopyImage
+	  else
+	   call MakeImage
+	  fi
+	  addw	[DOffset], DriveEntry_size
+	  incb	[Units]
+	  incb	[iUnits]
+	  mov	si, DriveMsg
+	 fi
+.cls:	 ifb {[type] ,e, 'F'} AND {!,[Mirror]}
+%ifdef GUNZIP
+	  call	_gz_close
+%else
+	  dos	3eh
+%endif
+	 fi
+	 if si ,ne, DriveMsg
+.noimg:   cmovby {!,[Ignore]}, [iUnits], -128
+	 fi
+	 Output
+	 restore
+	wend
+
+	mov	dx, [XMSrsrv]
+	ifnz dx
+	 mov	ah, 10
+	 call	far [xms]
+	fi
+	mov	dx, [XMStop]
+	ifnz dx
+	 mov	ah, 10
+	 call	far [xms]
+	fi
+
+	ifb [iUnits] ,le, 0
+	 call	FreeMemory
+	 jmp	Dont
+	fi
+
+	call	Allocate
+	call	SetRoot
+	call	Link
+
+	ifflg	[Verbose], \
+	 call	DisplayMemory
+	Output	InstallMsg
+
+	mov	ah, 4ch 		; exit
+	ifnflg	[Reloc]
+	 mov	es, [PSP]
+	 zero	ax
+	 xchg	ax, [es:2Ch]		; find environment and release it
+	 mov	es, ax
+	 dos	49h
+
+	 mov	dx, [DOffset]
+	 add	dx, 4fh 		; first 40h bytes of PSP and rounding
+	 shr	dx, 4			; para to keep
+	 mov	ah, 31h 		; stay resident and exit
+	fi
+	mov	al, [LoDrive]		; return first assigned drive number
+	inc	ax			; A: = 1
+	dos
+
+
+;+
+; FUNCTION : Allocate
+;
+;	Allocate high (or low if already high) memory for the driver,
+;	or relocate into the PSP.
+;
+; Parameters:
+;	[DOffset] := last byte
+;
+; Returns:
+;	[ResSeg] := segment to relocate to
+;
+; Destroys:
+;
+;-
+Allocate
+	ifflg	[Reloc]
+	 dos	5802h			; get current UMB state
+	 cbw
+	 push	ax			; save it
+	 dos	5800h			; get current allocation strategy
+	 push	ax			; save it
+	  mov	bx, 1			; link in UMB
+	  dos	5803h
+	  cmpw	[PSP], 0A000h		; already high?
+	  cmov	bl, b, 80h, 0		; high or low memory, first fit
+	  dos	5801h
+	  mov	bx, [DOffset]
+	  add	bx, 15			; paragraph rounding
+	  shr	bx, 4			; bytes to paras
+	  dos	48h
+	  pushf
+	  if nc
+	   mov	[ResSeg], ax
+	   dec	ax			; MCB of TSR
+	   mov	es, ax
+	   inc	ax
+	   mov	[es:1], ax		; make it own itself
+	   save ds
+	    mov ax, [PSP]
+	    dec ax			; MCB of installer
+	    mov ds, ax
+	    mov si, 8			; copy the MCB name
+	    mov di, si
+	    times 4 movsw
+	   restore
+	  fi
+	  pop	dx
+	 pop	bx			; restore allocation strategy
+	 dos	5801h
+	 pop	bx			; restore UMB state
+	 dos	5803h
+	 shr	dl, 1
+	 retif	nc
+	fi
+	cflg.	[Reloc]
+	mov	ax, [PSP]
+	add	ax, 4			; need to keep first 40h PSP bytes
+	mov	[ResSeg], ax
+	return
+
+
+;+
+; FUNCTION : Link
+;
+;	Link the driver into the device chain and relocate.
+;
+; Parameters:
+;	[DOffset] := number of bytes to relocate
+;	[HiDrive] := highest assigned drive number (A=0)
+;
+; Returns:
+;
+; Destroys:
+;
+;-
+Link
+	les	bx, [LoL]
+	mov	al, [HiDrive]
+	inc	ax
+	mov	[es:bx+20h], al 	; set new block "count"
+
+	add	bx, 22h 		; ES:BX[22] is NUL device header
+	mmovd	NextDriver, es:bx	; put NUL.next in our header
+	mov	ax, [ResSeg]
+	zero	si ; = RDRVHdr
+	sthl	ax,si, es:bx		; point NUL header at us
+
+	; relocate into the PSP/allocated memory
+	mov	es, ax
+	zero	di
+	mov	cx, [DOffset]
+	rep	movsb
+	ret
+
+
+;+
+; FUNCTION : UnInstall
+;
+;	Remove the driver from the device chain and free the memory.
+;
+; Parameters:
+;
+; Returns:
+;
+; Destroys:
+;
+;-
+UnInstall
+	les	bx, [LoL]		; get list of list
+	add	bx, 22h 		; ES:BX[22] is NUL (1st) device header
+	repeat
+	 ses	bx, buf 		; save current header addr
+	 les	bx, [es:bx]		; load next header addr into ES:BX
+	 inc	bx			; end of drivers?
+	 jz	.DriverNotFound
+	 dec	bx
+	 mov	cx, 7
+	 mov	si, DeviceName		; DS:SI is our device name
+	 lea	di, [bx+si]		; ES:DI is chained device name
+	 repe	cmpsb			; if eq it's the one we are looking for
+	until e
+	mov	ax, es
+	mov	[ResSeg], ax		; store segment (offset is zero)
+	save	ds,ax
+	 les	di, [buf]		; previous header now in ES:DI
+	 mov	ds, ax			; ES:BX is addr of driver being removed
+	 mov	si, bx			; put it into DS:SI
+	 times 2 movsw			; move address DS:SI -> ES:DI
+	 call	FreeMemory		; release the XMS memory
+	restore
+	sub	ax, 4			; locate the PSP of installed driver
+	mov	es, ax			;
+	ifw [es:0] ,ne, 20cdh		; PSP signature?
+	 add	ax, 4			; no, point back to driver
+	 mov	es, ax			;
+	fi				;
+	dos	49h			; free memory
+
+	; trace the DPB chain to remove the drives
+	zerob	[HiDrive]
+	les	bx, [LoL]
+	do
+	 les	bx, [es:bx]
+	 ifzw [es:bx+DPB.Device]
+	  mov	ax, [es:bx+DPB.Device+2]
+	 andif ax ,e, [ResSeg]
+	  call	ClrRoot
+	  save	ds,es
+	  ld	ds, es
+	  les	di, [cs:buf]
+	  add	di, DPB.NextDPB
+	  lea	si, [bx+DPB.NextDPB]
+	  times 2 movsw 		; unlink (prev->next = our->next)
+	  restore
+	 else
+	  mov	al, [es:bx+DPB.DriveNumber]
+	  cmov {al ,a, [HiDrive]}, [HiDrive], al
+	  ses	bx, buf
+	 fi
+	 add	bx, DPB.NextDPB
+	whilew [es:bx] ,ne, 0ffffh
+
+	les	bx, [LoL]		; restore block count
+	mov	al, [HiDrive]
+	inc	ax
+	mov	[es:bx+20h], al
+
+	mov	si, UnInstallMsg
+	zerob	[RC]
+	jmp	Xit
+
+.DriverNotFound:
+	mov	si, CouldNotRemoveMsg
+	jmp	Xit
+
+
+;+
+; FUNCTION : FreeMemory
+;
+;	Free the memory used by each image.
+;
+; Parameters:
+;	[Units] := number of images to free
+;
+; Returns:
+;
+; Destroys:
+;
+;-
+FreeMemory
+	movzx.	cx, [Units]
+	for0	si, Drive+DriveEntry.Handle, *,, DriveEntry_size
+	 mov	dx, [si]
+	 mov	ah, 10
+	 call	far [xms]
+	next
+	ret
+
+
+;+
+; FUNCTION : SetRoot
+;
+;	Set the Current Directory Structure with the new drives.
+;	Create and link in the DPBs.
+;
+; Parameters:
+;
+; Returns:
+;	[LoDrive] and [HiDrive] set as appropriate
+;
+; Destroys:
+;
+;-
+SetRoot
+	mov	dx, [ResSeg]
+	movzx.	cx, [Units]
+	for	si, Drive, *,, DriveEntry_size
+	 mov	al, CDS_size
+	 mov	bl, [si+DriveEntry.DPB+DPB.DriveNumber]
+	 cmov {bl ,b, [LoDrive]}, [LoDrive], bl
+	 cmov {bl ,a, [HiDrive]}, [HiDrive], bl
+	 les	di, [CDSbase]
+	 mul	bl
+	 add	di, ax
+	 mov	ax, 'A:'
+	 add	al, bl
+	 stosw				; CDS.CurrPath
+	 mov	ax, '\'
+	 stosw
+	 add	di, CDS.Flags - 4
+	 mov	ax, 4000h		; physical
+	 stosw
+	 lea	ax, [si+DriveEntry.DPB]
+	 mov	bp, ax
+	 stosw				; CDS.DPB
+	 mov	ax, dx
+	 stosw
+	 mov	ax, 0ffffh		; CDS.CurDir - never accessed
+	 stosw
+	 stosw				; CDS.FFFF
+	 stosw
+	 mov	ax, 2			; CDS.RootOff
+	 stosw
+	 mov	al, 0
+	 stosb				; CDS.Type
+	 stosw				; CDS.IFSRedir
+	 stosw
+
+	 ld	es, ds
+	 dos	53h			; DPB at DS:SI from BPB at ES:BP
+	 lea	di, [bp+DPB.Device]
+	 zero	ax ; = RDRVHdr
+	 stosw
+	 mov	ax, dx
+	 stosw
+	 inc	di			; skip DPB.MediaID
+	 mov	ax, 0ffffh
+	 stosb				; DPB.Accessed
+	 stosw				; DPB.NextDPB
+	 stosw
+
+	 les	di, [DPBChain]
+	 sthl	dx,bp, es:di+DPB.NextDPB
+	 sds	bp, DPBChain
+	next
+	ret
+
+
+;+
+; FUNCTION : ClrRoot
+;
+;	Remove the drive from the Current Directory Structure.
+;
+; Parameters:
+;	ES:BX -> DPB
+;
+; Returns:
+;
+; Destroys:
+;
+;-
+ClrRoot
+	uses	es
+	mov	al, CDS_size
+	mulb	[es:bx+DPB.DriveNumber]
+	les	di, [CDSbase]
+	add	di, ax
+	zero	ax
+	mov	[es:di+CDS.CurrPath+3], al ; reset path to root
+	add	di, CDS.Flags
+	stosw				; clear drive flags
+	stosw				; clear CDS.DPB
+	stosw
+	return
+
+
+;+
+; FUNCTION : MoveName
+;
+;	Copy the image filename from the command line to local storage
+;	and NUL-terminate it.
+;
+; Parameters:
+;	ES:DI -> name
+;	   CX := length of command line
+;
+; Returns:
+;	AL := drive letter (zero if not specified)
+;	DI & CX updated
+;
+; Destroys:
+;
+;-
+MoveName
+	mov	si, buf
+	zerob	[si]
+	cflg	[Ignore]
+	ifb [es:di] ,e, '?'
+	 sflg.	[Ignore]
+	 inc	di
+	 dec	cx
+	fi
+	retif	cxz
+	repeat
+	 mov	al, [es:di]
+	 mov	[si], al
+	 inc	si
+	 inc	di
+	next al ,ne, {',',' ','/'}
+	if. e,	dec si
+	mov	[si], ch		; command line < 256 chars
+
+	if {al ,e, ','} AND cxnz
+	 mov	al, [es:di]
+	 inc	di
+	 dec	cx
+	 cbit	al, 5
+	 ifb {[es:di] ,e, ':'} AND cxnz
+	  inc	di
+	  dec	cx
+	 fi
+	else
+.ret:	 mov	al, 0
+	fi
+	ret
+
+
+;+
+; FUNCTION : OpenFile
+;
+;	Open the file containing the image and check if it's valid.
+;
+; Parameters:
+;
+; Returns:
+;	NC & ZR if file opened and valid
+;	   BX := file handle (if not GUNZIP)
+;	NC & NZ if file opened, but invalid
+;	CY if file not opened
+;	   SI -> error message (in both cases)
+;
+; Destroys:
+;
+;-
+OpenFile
+	mov	si, buf
+	; check for a drive
+	cflg	[Mirror]
+	ifzb [si]
+	 movw	[si], 'A:'
+	 zerob	[si+2]
+	 jmp	.m
+	fi
+	ifw [si+1] ,e, ':'
+	 cbit	[si], 5
+.m:	 sflg.	[Mirror]
+	else
+	 ; canonicalize and display filename
+	 ld	es, ds
+	 mov	di, buf+128
+	 dos	60h
+	 mov	si, di
+	fi
+	Output
+
+	mov	si, FileNotFoundMsg
+
+	ifflg	[Mirror]
+	 mov	bx, buf
+	 mov	al, [bx]
+	 sub	al, 'A'
+	 mov	[mdrv], al
+	 mov	cx, 1
+	 zero	dx
+	 save	si
+	  int	25h
+	  pop	cx
+	 restore
+	 retif	c
+	 mov	cx, ax
+	 jmp	CheckImage.chk
+	fi
+
+	; open the file, see if it's a valid image
+%ifdef GUNZIP
+	push	buf
+	call	_gz_open
+	pop	cx
+	isz	ax			; clears carry
+	js	.noimg
+	zerow	[imgsize]
+	zerow	[imgsize+2]
+%else
+	mov	dx, buf
+	dos	3dc0h			; read only, deny none, private
+	retif	c
+	xchg	bx, ax
+%endif
+	zero	cx			; check for floppy first
+	zero	dx
+	call	CheckImage
+	retif	e			; also NC
+	cmpw	[buf+1feh], 0aa55h	; valid boot record?
+	stc
+	if e
+	 mov	dl, 0
+	 mov	dh, [buf+1beh+8]	; sectors preceeding first partition
+	 mov	cx, [buf+1beh+9]	;  * 256
+	 shl	dx, 1			;  and doubled = sectors to bytes
+	 rcl	cx, 1
+	 call	CheckImage
+	 stc
+	fi
+.noimg: cmc
+	return
+
+
+;+
+; FUNCTION : CheckImage
+;
+;	Read the BPB from the image and check for a 512-byte sector size.
+;
+; Parameters:
+;	CX:DX := offset of boot sector
+;	   BX := handle of image file
+;
+; Returns:
+;	ZR if valid image
+;	NZ if invalid image
+;	   SI -> error message
+;
+; Destroys:
+;
+;-
+CheckImage
+%ifdef GUNZIP
+	save	es
+	sub	dx, [imgsize]		; assume new position is after current
+	sbb	cx, [imgsize+2]
+	while nz OR {dx ,a, BUFSIZE}
+	 save	cx,dx
+	  mov	cx, BUFSIZE
+	  call	.gzrd
+	 restore
+	 sub	dx, BUFSIZE
+	 sbb	cx, 0
+	wend
+	mov	cx, dx
+	if. cxnz, \
+	 call	.gzrd
+
+	mov	ch, (SectorSize >> 8)*4 ; need at least four sectors (CL is 0)
+	call	.gzrd			; (boot sector, FAT, root dir, data)
+	restore
+%else
+	dos	4200h
+	mov	dx, buf
+	mov	cx, SectorSize*4
+	dos	3fh
+%endif
+.chk:	mov	si, InvalidImageFileMsg
+	if {ax ,e, cx} AND {word [buf+510] ,e, 0aa55h}
+	 ; see if we have a 512-byte sector
+	 cmpw	[BootBPB+BPB.BytesPerSector], SectorSize
+	fi
+	ret
+
+%ifdef GUNZIP
+.gzrd:	push	cx
+	push	buf
+	call	_gz_read
+	add	[imgsize],  ax
+	adcw	[imgsize+2], 0
+	pop	cx
+	pop	cx
+	ret
+%endif
+
+
+;+
+; FUNCTION : CopyImage
+;
+;	Copy the image from file to memory.
+;
+; Parameters:
+;	BX := file handle
+;	SI -> XMS move block
+;	[imgsize] := size of image in bytes (or sectors if mirroring)
+;
+; Returns:
+;
+; Destroys:
+;
+;-
+CopyImage
+	save	si
+	 ifflg	[Mirror]
+	  mov	ax, [imgsize]		; convert sectors to Mi
+	  shr	ax, 11
+	 else
+	  mov	ax, [imgsize+2] 	; convert bytes to Mi
+	  shr	ax, 4
+	 fi
+	 mov	si, Progress+3
+	 mov	cx, 3
+	 save	si
+	  call	itoan
+	 restore
+	 prch	' '
+	 Output 			; display mebibytes countdown
+	restore
+	mov	di, Mi+1		; update count every MiB
+	mov	ax, SectorSize*4	; copy what's already been read
+	ifflg	[Mirror]
+	 mov	ax, SectorSize
+	 zerow	[dstsect]
+	 jmp	.begin
+.mirror: shr	ax, SectorShift
+	 add	[dstsect], ax
+	 sub	[imgsize], ax
+	 jz	.done
+	 mov	cx, [imgsize]
+	 cmov	{cx ,ae, BufSectors}, cx, BufSectors
+	 push	cx
+	 save	si,di
+	  mov	bx, buf
+	  mov	al, i(mdrv)
+mdrv ib
+	  mov	dx, i(dstsect)
+dstsect iw
+	  int	25h
+	  pop	ax
+	 restore
+	 pop	ax
+	 shl	ax, SectorShift
+	 jmp	.begin
+	fi
+%ifdef GUNZIP
+	push	BUFSIZE
+	push	buf
+	jmp	.begin
+	do
+	 call	_gz_read
+	 isz	ax
+	 break	le
+%else
+	mov	cx, BUFSIZE
+	mov	dx, buf
+	jmp	.begin
+	do
+	 dos	3fh
+	 break	ax zr
+%endif
+	 if {[imgsize+2] zw} AND {ax ,a, [imgsize]}
+	  mov	ax, [imgsize]
+	 fi
+	 inc	ax			; XMS requires even number of bytes
+	 and	al, ~1
+.begin:  mov	[bytes], ax
+	 dec	di
+	 if z
+	  save	dx,si
+	   mov	si, Progress
+	   decb [si+5]
+	   ifb	[si+5] ,b, '0'
+	    movb [si+5], '9'
+	    decb [si+4]
+	    ifb [si+4] ,e, '0'
+	     ifb. {[si+3] ,e, ' '}, movb [si+4], ' '
+	    elif b
+	     movb [si+4], '9'
+	     decb [si+3]
+	     ifb. {[si+3] ,e, '0'}, movb [si+3], ' '
+	    fi
+	   fi
+	   Output
+	  restore
+	  mov	di, Mi
+	 fi
+	 mov	ah, 0bh
+	 call	far [xms]
+	 mov	ax, [bytes]
+	 addw	[dsto],  ax
+	 adcw	[dsto+2], 0
+	 jflg	[Mirror], .mirror
+	 subw	[imgsize],  ax
+	 sbbw	[imgsize+2], 0
+	while g 			; assume image < 2GiB
+
+%ifdef GUNZIP
+	pop	cx
+	pop	cx
+%endif
+
+.done:	prch	8
+	prch.
+	prch.
+	prch.
+	ret
+
+
+;+
+; FUNCTION : MakeBPB
+;
+;	Make a BPB from the given parameters.
+;
+; Parameters:
+;	ES:DI -> parameter list
+;	   CX := length of command line
+;
+; Returns:
+;	AL := drive letter (zero if not specified)
+;	DI & CX updated
+;
+; Destroys:
+;
+;-
+MakeBPB
+	save	es,di,cx
+	 ld	es, ds			; clear out the buffer
+	 mov	di, buf
+	 mov	cx, BUFSIZE / 2
+	 zero	ax
+	 rep	stosw
+	 mov	si, BootSect		; put the default BPB into the
+	 mov	di, buf 		;  boot sector
+	 mov	cl, 11+BPB_size
+	 rep	movsb
+	restore
+
+	; read the drive size and convert to sectors
+	cflg	[freespc]		; default size is in sectors
+	call	atoi
+	if nz
+	 sflg.	[freespc]		; size is free space, not total
+	 cbit	bl, 5
+	 if bl ,e, 'M'                  ; mebibytes
+	  save	cx
+	  repeat ,11			; multiply by 1048576/512 = 2048
+	   shl	ax, 1
+	   rcl	dx, 1
+	  next
+	  restore
+	  inc	di
+	  dec	cx
+	 elif bl ,e, 'K'                ; kibibytes
+	  shl	ax, 1			; multiply by 1024/512 = 2
+	  rcl	dx, 1
+	  inc	di
+	  dec	cx
+	 else				; bytes or predefined format
+	  call	FindSize
+	 fi
+	 sthl	dx,ax, BootBPB+BPB.BigTotalNumSectors
+	fi
+
+	; read in any other options
+	zerob	[.drv]			; no drive letter, yet
+	while cx nzr			; too big for jcxz
+	 mov	al, [es:di]
+	 break	al ,e, {' ','/'}
+	 inc	di
+	 dec	cx
+	 ifb [es:di] ,e, ':'
+	  inc	di
+	  dec	cx
+	 fi
+	 if al ,e, '$'                  ; volume label
+	  mov	si, BootBPB+BPB.VolLabel
+	  mov	dx, 11
+	  rptlmt dx
+	   mov	al, [es:di]
+	   break al ,e, {',',' ','/'}
+	   if. {al ,[], 'a','z'}, cbit al, 5
+	   mov	[si], al
+	   inc	di
+	   inc	si
+	  next
+	  repeat0r dx			; fill remainder with spaces
+	   movb [si], ' '
+	   inc	si
+	  next
+	  cntnu
+	 fi
+	 cntnu	al ,e, ','
+	 cbit	al, 5
+	 push	ax
+	  call	atoi
+	 pop	bx
+	 if z				; assume drive letter
+	  if bl ,e, 'C'                 ;  if not cluster
+	   inc	ax
+	   mov	[BootBPB+BPB.ClusterSize], al
+	  else
+	   mov	[.drv], bl
+	  fi
+	 elif bl ,e, 'S'                ; size in sectors
+	  sthl	dx,ax, BootBPB+BPB.BigTotalNumSectors
+	  ifnz dx, zero ax
+	  mov	[BootBPB+BPB.TotalNumSectors], ax
+	  cflg	[freespc]
+	 elif bl ,e, 'C'                ; cluster size in kibibytes
+	  if {dx nzr} OR {ax ,ae, 64}	; 64Ki is maximum
+	   mov dl, 128
+	  else
+	   mov dh, 2 ;dx, 512		; convert to sectors per cluster
+	   repeat			; find highest bit
+	    shr dx, 1
+	    shl al, 1
+	   until c
+	   if. nz, shl dl, 1		; round up
+	  fi
+	  mov	[BootBPB+BPB.ClusterSize], dl
+	 elif bl ,e, 'D'
+	  add	ax, 15			; 16 entries per sector
+	  adc	dx, 0
+	  cmov nz, ax, 65535
+	  and	al, ~15
+	  mov	[BootBPB+BPB.MaxNumRootDirEntries], ax
+	 elif bl ,e, 'F'
+	  cmp	ax, 1
+	  mov	al, 2
+	  if. be, dec ax
+	  mov	[BootBPB+BPB.NumCopiesOfFat], al
+	 fi
+	wend
+
+	save	di,cx
+
+	ldhl	dx,ax, BootBPB+BPB.BigTotalNumSectors
+	mov	di, [BootBPB+BPB.MaxNumRootDirEntries]
+	shr	di, 4			; root directory sectors
+	inc	di			; boot sector
+
+	ifflg	[freespc]		; DX:AX is desired available sectors
+	 mov	cl, [BootBPB+BPB.ClusterSize]
+	 dec	cx			; round up to desired cluster size
+	 add	ax, cx
+	 adc	dx, 0
+	 not	cx
+	 and	ax, cx
+	 save	dx,ax
+	  call	GetClusters
+	  if cx ,b, 0ff6h		; FAT12
+	   mov	si, dx
+	  else
+	   xchg si, ax
+	   movb [BootBPB+BPB.FSType+4], '6'     ; change type to "FAT16"
+	  fi
+	 restore
+	 add	di, si
+	 ifb. {[BootBPB+BPB.NumCopiesOfFat] ,e, 2}, \
+	  add	di, si
+	 add	ax, di
+	 adc	dx, 0
+	 sthl	dx,ax, BootBPB+BPB.BigTotalNumSectors
+	 ifnz dx, zero ax
+	 mov	[BootBPB+BPB.TotalNumSectors], ax
+	 xchg	ax, si
+	 jmp	.fat
+	fi
+
+	; determine the number of FAT sectors given all available sectors
+	sub	ax, di
+	sbb	dx, 0
+	if c				; not enough for the boot/root
+	 lea	ax, [di+2]		;  so use that many, plus two more
+	 cwd
+	 sthl	dx,ax, BootBPB+BPB.BigTotalNumSectors
+	 mov	[BootBPB+BPB.TotalNumSectors], ax
+	fi
+	save	dx,ax
+	 call	GetClusters
+	 mov	si, dx
+	 xchg	di, ax
+	restore
+	; reduce sectors by that many and see if FAT12 would fit
+	save	dx,ax
+	 sub	ax, si
+	 sbb	dx, 0
+	 call	GetClusters
+	 if cx ,b, 0ff6h		; FAT12
+	  xchg	ax, dx
+	  pop	cx
+	  pop	cx
+	  jmp	.fat
+	 fi
+	restore
+	; didn't fit in FAT12, calculate for FAT16 sectors
+	movb	[BootBPB+BPB.FSType+4], '6'
+	sub	ax, di
+	sbb	dx, 0
+	call	GetClusters
+.fat:	mov	[BootBPB+BPB.NumSectorsPerFat], ax
+	mov	[BootBPB+BPB.ClusterSize], bl
+
+	; get the time and date for the VSN and volume label directory entry
+	dos	2ch			; Get System Time
+	mov	bx, BootBPB+BPB.VSN	; pseudo-VSN: MMDD-HHMM
+	mov	al, cl			; minute
+	call	.bin2bcd
+	mov	al, ch			; hour
+	call	.bin2bcd
+
+	mov	al, ch			; hour
+	shl	ax, 6
+	or	al, cl			; minute
+	shl	ax, 5
+	shr	dh, 1			; seconds / 2
+	or	al, dh
+	mov	[Vtime], ax
+
+	dos	2ah			; Get System Date
+	mov	ax, cx			; year
+	sub	ax, 1980		;  from 1980
+	shl	ax, 4
+	or	al, dh			; month
+	shl	ax, 5
+	or	al, dl			; day
+	mov	[Vdate], ax
+
+	mov	al, dl			; day
+	call	.bin2bcd
+	mov	al, dh			; month
+	call	.bin2bcd
+
+	; display the label to identify the drive
+	zerob	[BootBPB+BPB.FSType]
+	Output	 BootBPB+BPB.VolLabel
+	movb	[BootBPB+BPB.FSType], 'F'
+
+	restore
+	mov	al, i(.drv)
+.drv ib
+	ret
+
+.bin2bcd:
+	aam				; split AL into tens (AH) & units (AL)
+	aad	16			; combine it back into AL as BCD
+	mov	[bx], al
+	inc	bx
+	ret
+
+
+;+
+; FUNCTION : FindSize
+;
+;	Determine if the size specified exists in the floppy table.
+;
+; Parameters:
+;	AX := size (in bytes)
+;
+; Returns:
+;	DX:AX := sectors
+;
+; Destroys:
+;
+;-
+FindSize
+	shl	ax, 1			; double it for the sector count
+	for	si, FlopTable, {,b, FlopTableEnd}, FlopSize
+	 if [si+2] ,e, ax
+	  zero	dx
+	  save	es,di,ax
+	   ld	es, ds
+	   mov	di, BootBPB+BPB.ClusterSize
+	   movsb			; sectors per cluster
+	   scasw			; always one reserved sector
+	   mov	al, 2
+	   stosb			; two FATs
+	   movsb			; root directory entries
+	   mov	al, 0
+	   stosb
+	   movsw			; total sectors
+	   scasb			; media descriptor always F8
+	   stosw			; sectors per FAT is calculated
+	   movsb			; sectors per track
+	   stosb
+	   inc ax			; one head for 64 root entries,
+	   ifb. {[si-5] ,ne, 64}, \
+	    inc ax			;  two otherwise
+	   stosb
+	  restore
+	  cflg. [freespc]
+	  ret
+	 fi
+	 break a
+	next
+	shr	ax, 1			; back to bytes
+	add	ax, SectorSize-1	; round up
+	adc	dx, 0
+	shr	dx, 1			; divide by 512:
+	rcr	ax, 1			;  halve,
+	mov	al, ah			;  then simply move bytes
+	mov	ah, dl			;  to divide by 256
+	shr	dx, 8
+	ret
+
+
+;+
+; FUNCTION : GetClusters
+;
+;	Convert sectors to clusters and determine the FAT sectors required.
+;
+; Parameters:
+;	DX:AX := sectors
+;
+; Returns:
+;	DX := FAT12 sectors
+;	AX := FAT16 sectors
+;	CX := number of clusters
+;	BL := sectors per cluster
+;
+; Destroys:
+;
+;-
+GetClusters
+	mov	bx, 1			; determine the smallest cluster size
+	while {dx nzr} OR {ax ,ae, 0fff0h-1}
+	 shl	bl, 1
+	 shr	dx, 1
+	 rcr	ax, 1
+	wend
+	; keep going for the desired cluster size
+	while {ax ,a, 1} AND {bl ,b, [BootBPB+BPB.ClusterSize]}
+	 shl	bl, 1
+	 shr	ax, 1
+	wend
+	mov	cx, ax
+	; see how many FAT12 sectors would be required
+	mov	dx, ax			; 1.5 bytes per entry
+	add	dx, dx			;  is 1024/3 entries per sector
+	add	dx, ax
+	add	dx, 1023		; overflow doesn't matter,
+	shr	dx, 10			;  clusters will indicate FAT16
+	; and FAT16 sectors
+	add	ax, 255 		; 256 entries per sector
+	rcr	ax, 1
+	shr	ax, 7
+	ret
+
+
+;+
+; FUNCTION : MakeImage
+;
+;	Initialise the RAM drive.
+;
+; Parameters:
+;	SI -> XMS move block
+;
+; Returns:
+;
+; Destroys:
+;
+;-
+MakeImage
+	mov	di, buf + SectorSize	; first FAT sector
+	movw	[di-2], 0aa55h		; boot sector signature
+	movb	[di], 0f8h		; media byte
+	orw	[di+1], -1		; initial cluster
+	ifb. {[BootBPB+BPB.FSType+4] ,e, '6'}, \
+	 movb	[di+3], -1		; additional byte for FAT16
+
+	; write the boot and FAT sectors
+	mov	cx, [BootBPB+BPB.NumSectorsPerFat]
+	inc	cx
+	mov	dx, BufSectors
+	call	.copy
+	ifb [BootBPB+BPB.NumCopiesOfFat] ,e, 2
+	 mov	cx, [BootBPB+BPB.NumSectorsPerFat]
+	 call	.copy
+	fi
+
+	; create the volume label entry and write the root directory sectors
+	save	si
+	 mov	si, BootBPB+BPB.VolLabel
+	 ifb [si] ,e, ' '               ; no label
+	  zero	ax			; remove FAT bytes
+	  stosw
+	  stosw
+	 else
+	  mov	cl, 11
+	  rep	movsb
+	  mov	si, VolEntry
+	  mov	cl, 32-11
+	  rep	movsb
+	 fi
+	restore
+	mov	cx, [BootBPB+BPB.MaxNumRootDirEntries]
+	shr	cx, 4
+
+.copy:	; copy boot/FAT or root directory sectors to XMS
+	call	.cpy
+	movb	[si-EMM+srco+1], 4	; SectorSize * 2
+	while cxnz			; all the zero sectors
+	 mov	dx, BufSectors - 2
+	 call	.cpy
+	wend
+	movb	[si-EMM+srco+1], 2	; SectorSize
+	mov	dx, BufSectors - 1
+	ret
+
+.cpy:	cmov {dx ,a, cx}, dx, cx
+	sub	cx, dx
+	shl	dx, SectorShift
+	mov	[si-EMM+bytes], dx
+	mov	ah, 0bh
+	call	far [xms]
+	add	[si-EMM+dsto],	dx
+	adcw	[si-EMM+dsto+2], 0
+	ret
+
+
+;+
+; FUNCTION : Initialise
+;
+;	Get the last DPB in the chain, the highest available drive letter
+;	and the CDS pointer.
+;
+; Parameters:
+;
+; Returns:
+;
+; Destroys:
+;
+;-
+Initialise
+	dos	52h				; List of Lists
+	ses	bx, LoL
+
+	mmovd	CDSbase, es:bx+16h		; Current Directory Structure
+	mov	ax, [es:bx+20h] 		; block units, lastdrive
+	dec	ax
+	mov	[HiDrive], ax			; NumDrives
+
+	do
+	 les	bx, [es:bx]			; first DPB
+	 add	bx, DPB.NextDPB
+	whilew [es:bx] ,ne, 0ffffh
+	sub	bx, DPB.NextDPB
+	ses	bx, DPBChain
+
+	mov	es, [PSP]
+	ret
+
+
+;+
+; FUNCTION : FindAvailDrive
+;
+;	Find first available drive letter.
+;
+; Parameters:
+;	CL := start letter (0 = A)
+;
+; Returns:
+;	CY if no drive available
+;	CL := drive letter found
+;
+; Destroys:
+;
+;-
+FindAvailDrive
+	mov	al, CDS_size
+	mul	cl
+	les	si, [CDSbase]
+	add	si, ax
+	for	si,, {cl ,be, [NumDrives]}, CDS_size
+	 retifb [es:si+CDS.Flags+1] ,&!, 0C0h  ; drive in use? (clears carry)
+	 inc	cx
+	next
+	stc
+	return
+
+
+;+
+; FUNCTION : DisplayMemory
+;
+;	Display the memory usage.
+;
+; Parameters:
+;	[DOffset] := last byte
+;	[XMSsize] := size of allocated XMS (in KiB)
+;
+; Returns:
+;
+; Destroys:
+;
+;-
+DisplayMemory
+	Output	MemoryUsage
+	cmpw	[ResSeg], 0A000h
+	cmov	si, ae, MemoryHigh, CRLF
+	Output
+	mov	ax, [DOffset]
+	ifnflg	[Reloc], \
+	 add	ax, 40h 		; PSP
+	add	ax, 15			; round to
+	and	al, ~15 		;  paragraph
+	mov	si, MemoryTotal
+	mov	bx, ax
+	call	itoa
+	cmov	ax, [Reloc], Drive, 40h + Drive
+	mov	si, MemoryStatic
+	sub	bx, ax
+	call	itoa
+	xchg	ax, bx
+	mov	si, MemoryDynamic
+	call	itoa
+	mov	si, MemoryXMS
+	mov	ax, [XMSsize]
+	ifnzw	[XMSsize+2]		; if smaller than 64MiB display as KiB
+	 repeat 10			; otherwise as MiB
+	  shrw	[XMSsize+2], 1
+	  rcr	ax, 1
+	 next
+	 movw	[si+6], 'me'
+	fi
+	call	itoa
+	Output	MemoryBytes
+	ret
+
+
+;+
+; FUNCTION : itoa
+;
+;	Convert a binary number to a space-padded string.
+;
+; Parameters:
+;	AX := number
+;	SI -> buffer
+;
+; Returns:
+;
+; Destroys:
+;
+;-
+itoa
+	mov	cx, 5
+itoan
+	for	si,,*,,+		; fill with spaces
+	 movb	[si], ' '
+	next
+	mov	cl, 10			; base
+	do
+	 zero	dx
+	 div	cx
+	 dec	si
+	 add	dl, '0'
+	 mov	[si], dl
+	while ax nzr
+	ret
+
+
+;+
+; FUNCTION : atoi
+;
+;	Convert a string to a number.
+;
+; Parameters:
+;	ES:DI -> string
+;	   CX := length
+;
+; Returns:
+;	DX:AX := number (ZF set accordingly)
+;	BL := character that stopped conversion
+;	DI & CX updated to end of number
+;
+; Destroys:
+;
+;-
+atoi
+	zero	ax
+	zero	bx
+	cwd
+	repeat0
+	 mov	bl, [es:di]
+	 break	bl ,[!], {'0','9'}
+	 sub	bl, '0'
+	 shl	ax, 1
+	 rcl	dx, 1
+	 mov	si, dx
+	 mov	bp, ax
+	 shl	ax, 1
+	 rcl	dx, 1
+	 shl	ax, 1
+	 rcl	dx, 1
+	 add	ax, bp			; DX:AX * 8 + DX:AX * 2 = DX:AX * 10
+	 adc	dx, si
+	 add	ax, bx
+	 adc	dx, 0
+	 inc	di
+	next
+	mov	si, dx
+	or	si, ax
+	ret
+
+
+;+
+; FUNCTION : FindImage
+;
+;	Search the command line for an image parameter (/F or /D).
+;
+; Parameters:
+;       ES:DI -> command line
+;	   CX := length of command line
+;
+; Returns:
+;	NC if found
+;	   AL := 'F' or 'D' depending on type
+;	   ES:DI -> parameters
+;	   CX := length
+;	CY if not found
+;
+; Destroys:
+;
+;-
+FindImage
+	while
+	 call	GetNextParm
+	is nc
+	 ifz al
+	  cmov	al, {byte [es:di] ,[], '0','9'}, 'D', 'F'
+	 fi
+	 break	al ,e, {'D','F'}
+	 call	SkipParm
+	wend
+	ret
+
+
+;+
+; FUNCTION : FindOpt
+;
+;	Scans command line for argument of form /X or -X where
+;	X = specified ASCII character. Presumes that argument is preceded
+;	by a '/' or a '-'. Comparisons are case insensitive.
+;
+; Parameters:
+;	AL := option character to scan for (uppercase)
+;	ES := PSP segment
+;
+; Returns:
+;	NC if found, CY if not
+;	ES:DI -> remaining command line
+;	   CX := chars left on command line
+;
+; Destroys:
+;
+;-
+FindOpt
+	mov	di, 80h 		; command line length PSP +80h
+	movzx.	cx, [es:di]
+	inc	di
+	;if. {al ,[], 'a','z'}, cbit al, 5 ; Make character upper case
+	mov	ah, al
+	while
+	 call	GetNextParm
+	 break	c OR {ah ,e, al}
+	 call	SkipParm
+	wend
+	ret
+
+
+;+
+; FUNCTION : GetNextParm
+;
+;	Get the next command line parameter.
+;
+; Parameters:
+;	ES:DI -> address of command line
+;	   CX := command line length
+;
+; Returns:
+;	CY if no more parameters
+;	NC if parameter found
+;	   AL := 0 if parameter doesn't start with '/' or '-'
+;		 uppercase option character if it does
+;	ES:DI -> pointer to argument (parameter or option's value)
+;	   CX := chars left on command line
+;
+; Destroys:
+;
+;-
+GetNextParm
+	jcxz	.none			; nothing left
+	repeat				; skip blanks
+	 mov	al, [es:di]
+	 inc	di
+	next al ,e, ' '
+	je	.none			; nothing but blanks
+
+	if {al ,e, '/','-'} AND cxnz    ; Found option
+	 mov	al, [es:di]
+	 if. {al ,[], 'a','z'}, cbit al, 5
+	 inc	di
+	 dec	cx
+	 ifb [es:di] ,e, ':'            ; skip over option/value separator
+	  inc	di			; (no need to test length)
+	  dec	cx
+	 fi
+	 clc
+	 ret
+	fi
+	dec	di			; point back to the parameter
+	inc	cx
+	zero	al			; clears carry
+	ret
+
+.none:	stc
+	ret
+
+
+;+
+; FUNCTION : SkipParm
+;
+;	Skip the remaining characters of a parameter.
+;
+; Parameters:
+;	ES:DI -> address of command line
+;	   CX := command line length
+;
+; Returns:
+;	ES:DI -> pointer to next parameter
+;	   CX := chars left on command line
+;
+; Destroys:
+;
+;-
+SkipParm
+	repeat0
+	 mov	al, [es:di]
+	 inc	di
+	next {al ,ne, ' ','/'}          ; '-' only starts an option
+	if e				; need to point back to '/'
+	 dec	di
+	 inc	cx
+	fi
+	ret
+
+
+%ifdef GUNZIP
+; Supply Borland's long shift functions.
+global N_LXURSH@, N_LXLSH@
+
+N_LXURSH@
+	if cl ,b, 16
+	 mov	bx, dx
+	 shr	ax, cl
+	 shr	dx, cl
+	 neg	cl
+	 add	cl, 16
+	 shl	bx, cl
+	 or	ax, bx
+	 ret
+	fi
+	sub	cl, 16
+	xchg	dx, ax
+	zero	dx
+	shr	ax, cl
+	ret
+
+N_LXLSH@
+	if cl ,b, 16
+	 mov	bx, ax
+	 shl	ax, cl
+	 shl	dx, cl
+	 neg	cl
+	 add	cl, 16
+	 shr	bx, cl
+	 or	dx, bx
+	 ret
+	fi
+	sub	cl, 16
+	xchg	dx, ax
+	zero	ax
+	shl	dx, cl
+	ret
+%endif
+
+
+segment _STACK stack class=STACK
+	resw	128
+stacktop

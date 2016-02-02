@@ -1,0 +1,164 @@
+XFDisk I Version 0.9.3 Beta EN
+==============================================================================
+History
+
+Legend:
+------------------------------------------------------------------------------
++ Feature added
+- Feature removed
+* Bugfix
+! Known Bug
+# Internal change
+
+
+XFDisk I Version 0.9.3 Beta EN
+------------------------------------------------------------------------------
+* reduced Boot Manager size and moved to end of first head (n sectores/head ->
+  CHS 0/0/n-13 upto 0/0/n). This should solve the problem with HighPoint/Abit
+  IDE adapter cards
+
+
+XFDisk I Version 0.9.2 Beta EN
+------------------------------------------------------------------------------
+* Boot Manager tried to boot from floppy after timeout if simple menue was
+  activated
+# extended INT13-BIOS-functions are only used if more than one additional
+  cylinder is availble (hopefully helps to resolve problem with some old
+  SCSI systems)
+
+
+XFDisk I Version 0.9.1 Beta EN
+------------------------------------------------------------------------------
++ Partition Area can be erased completely at users choice
+# /NOINIT switch dropped, functionality moved to menue
+# /PQMAGIC switch dropped, it's now default mode
+# /AUTOHIDE switch set to default in INI file
+! XFDisk boot manager will be erased by OS/2 Warp 5 Server and BIOS saving
+  of HighPoint/Abit IDE adapter cards, because they all use the same "free"
+  area of the first hard disk
+Changes in Build 318:
++ XFDisk checks if XFDisks MBR is installed when the Boot Manager is installed
++ XFDisk does not delete Partition Magics settings every time the Boot Manager
+  is updated
+* /PQMAGIC mode was inactive
+Changes in Build 319:
+* test of MBR corrected
+* bug in progress bar corrected
+Changes in Build 320:
+* arithmetical overflow during initialization of large partitions fixed
+Changes in Build 321:
++ Boot Manager: additional boot option (F2) added to boot from floppy but
+  change partition table as booting selected partition before
+
+
+XFDisk I Version 0.9.0 Beta EN
+------------------------------------------------------------------------------
++ XFDisk now supports multiple visible primary partitions. In this mode
+  the boot manager will not hide primary partitions any more. Using command
+  line parameter /AUTOHIDE, XFDisk will act as before and allow only one
+  visible primary partition per drive.
++ It is possible to install the boot manager without allowing XFDisk to
+  do any changes in the partition table. Changes in the partition table
+  can be allowed or rejected for each drive separatly.
++ XFDisk doens not change the order of existing partition table entries.
+  Sorting can be forced by using parameter /SORT.
+# The boot manager will be encrypted as in earlier versions to avoid
+  Partition Magic using unused space for saving its configuration.
+Changes to Alpha versions:
+* Build 314: the boot manager now should again control the active flag of
+  the partition table
++ Build 314: a wrong checksum of the boot manager will not cause XFDisk
+  to deinstall it
+* Build 315: fixed assignment of drive letters that caused a message of
+  insufficent memory
+* Build 316: unhiding a partition will only hide others in /AUTOHIDE mode
+
+
+XFDisk I Version 0.8.5 Beta EN
+------------------------------------------------------------------------------
+* The Bootmanager just warns if the boot block was modified. This is useful
+  because Partition Magic sometimes modifies an unused data area.
+
+
+XFDisk I Version 0.8.4 Beta EN
+------------------------------------------------------------------------------
++ Command line parameters /NOWIN9X, /OS2, /WINNT and /LINUX added to allow
+  control over default partition types used by XFDisk
+
+
+XFDisk I Version 0.8.3 Beta EN
+------------------------------------------------------------------------------
++ Command line parameters can be set in the file XFDISK.INI
++ Command line parameter /PQMAGIC activates Power Quest Partition Magic
+  compatibility
++ Implemented a menu for the most important partition types
++ Partitioning ad configuration can be saved to/loaded from a file
++ Implemented simple menus for the Bootmanager
++ The partition selected last time in the Bootmanager can be changed with
+  XFDisk (together with "Remember choice" this makes possible the choice
+  of the partition to boot without changing the entry number)
++ Master and partition password will be asked upon manipulating functions
+  of XFDisk once per session
+* The end of an extended partition will be determined by the last logical
+  drive and not by the free space that is reserved for logical drives.
+# Changed menu code
+# Changed version scheme... again... ;-)
+
+
+XFDisk I Version 0.8.2 Beta EN
+------------------------------------------------------------------------------
++ new command line argument /NOINIT disables initialization of new partitions
+  for recovery purposes
+* free area within extended partitions caused wrong sized partition table
+  entry
+
+
+XFDisk I Version 0.8.1 Beta EN
+------------------------------------------------------------------------------
+* logical partitions at the end of the disk were always marked as
+  logical partitions with int13x support required
+* corrected chaining within logical partitions with int13x
+* corrected initialisation of logical partitions
+
+
+XFDisk I Version 0.8.0 Beta EN
+------------------------------------------------------------------------------
++ Support for Harddisks >8 GB through extended INT13-BIOS-functions
+* XFDisk crashed when the extended partition was empty
+* If the extended partition started at cylinder 0, the partition sectors of
+  the logical drives were corrupted
+# Changed code to read the partition table
+# Changed code to align new partitions
+
+
+XFDisk I Version 0.7.0 Beta EN - GPL
+------------------------------------------------------------------------------
+# XFDisk is now distributed under the GNU General Public License (GPL.TXT).
+  The original version of the GPL is on the Internet at
+  	http://www.gnu.org/copyleft/gpl.html
+  The source of XFDisk is available for download on the Internet at
+  	http://home.pages.de/~f.painke/
+
+
+XFDisk I Version 0.7.0 Beta EN
+------------------------------------------------------------------------------
++ The Bootmanager can now remeber the choice in the Boot Menu
+* On activating a partition all other partitions on all other drives were
+  deactivated
+* Problems with not correctly initialised partitions should be solved
+* Partitions larger than 2 GB will be FAT32 by default
+# Changed code for writing to/reading from harddisk
+
+
+XFDisk I Version 0.6.0 Beta EN
+------------------------------------------------------------------------------
+! XFDisk won't initialise new partitions correctly, so there may be problems
+  using DOS format. This only happens when using large harddisks and creating
+  partitions of other size at the place of a deleted partition.
+! XFDisk won't work with harddisk with more than 1024 Cylinders. The limit for
+  older BIOSes is 504 MB, for newer systems depending on the BIOS the limit is
+  at 1008 MB, 2016 MB, 4032 MB or 8064 MB.
+! The Bootmanager can't boot some Systems (like QNX or Solaris)
+
+This is the first 'international' version of XFDisk.
+==============================================================================

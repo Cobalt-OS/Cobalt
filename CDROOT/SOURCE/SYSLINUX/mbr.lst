@@ -1,0 +1,274 @@
+     1                                  ; -----------------------------------------------------------------------
+     2                                  ;   
+     3                                  ;   Copyright 2003-2004 H. Peter Anvin - All Rights Reserved
+     4                                  ;
+     5                                  ;   Permission is hereby granted, free of charge, to any person
+     6                                  ;   obtaining a copy of this software and associated documentation
+     7                                  ;   files (the "Software"), to deal in the Software without
+     8                                  ;   restriction, including without limitation the rights to use,
+     9                                  ;   copy, modify, merge, publish, distribute, sublicense, and/or
+    10                                  ;   sell copies of the Software, and to permit persons to whom
+    11                                  ;   the Software is furnished to do so, subject to the following
+    12                                  ;   conditions:
+    13                                  ;   
+    14                                  ;   The above copyright notice and this permission notice shall
+    15                                  ;   be included in all copies or substantial portions of the Software.
+    16                                  ;   
+    17                                  ;   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+    18                                  ;   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+    19                                  ;   OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+    20                                  ;   NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+    21                                  ;   HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+    22                                  ;   WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+    23                                  ;   FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+    24                                  ;   OTHER DEALINGS IN THE SOFTWARE.
+    25                                  ;
+    26                                  ; -----------------------------------------------------------------------
+    27                                  
+    28                                  ;
+    29                                  ; mbr.asm
+    30                                  ;
+    31                                  ; Simple Master Boot Record, including support for EBIOS extensions.
+    32                                  ; 
+    33                                  ; The MBR lives in front of the boot sector, and is responsible for
+    34                                  ; loading the boot sector of the active partition.  The EBIOS support
+    35                                  ; is needed if the active partition starts beyond cylinder 1024.
+    36                                  ; 
+    37                                  ; This MBR determines all geometry info at runtime.  It uses only the
+    38                                  ; linear block field in the partition table.  It does, however, pass
+    39                                  ; the partition table information unchanged to the target OS.
+    40                                  ;
+    41                                  ; This MBR should be "8086-clean", i.e. not require a 386.
+    42                                  ;
+    43                                  
+    44                                  %include "bios.inc"
+    45                              <1> ;; $Id: bios.inc,v 1.2 2004/01/29 06:54:51 hpa Exp $
+    46                              <1> ;; -----------------------------------------------------------------------
+    47                              <1> ;;   
+    48                              <1> ;;   Copyright 1994-2004 H. Peter Anvin - All Rights Reserved
+    49                              <1> ;;
+    50                              <1> ;;   This program is free software; you can redistribute it and/or modify
+    51                              <1> ;;   it under the terms of the GNU General Public License as published by
+    52                              <1> ;;   the Free Software Foundation, Inc., 53 Temple Place Ste 330,
+    53                              <1> ;;   Bostom MA 02111-1307, USA; either version 2 of the License, or
+    54                              <1> ;;   (at your option) any later version; incorporated herein by reference.
+    55                              <1> ;;
+    56                              <1> ;; -----------------------------------------------------------------------
+    57                              <1> 
+    58                              <1> ;;
+    59                              <1> ;; bios.inc
+    60                              <1> ;; 
+    61                              <1> ;; Header file for the BIOS data structures etc.
+    62                              <1> ;;
+    63                              <1> 
+    64                              <1> %ifndef _BIOS_INC
+    65                              <1> %define _BIOS_INC
+    66                              <1> 
+    67                              <1> 		absolute 4*1Eh		; In the interrupt table
+    68                              <1> fdctab		equ $
+    69 00000078 <res 00000002>      <1> fdctab1		resw 1
+    70 0000007A <res 00000002>      <1> fdctab2		resw 1
+    71                              <1> 		absolute 0400h
+    72 00000400 <res 00000008>      <1> serial_base	resw 4			; Base addresses for 4 serial ports
+    73                              <1> 		absolute 0413h
+    74 00000413 <res 00000002>      <1> BIOS_fbm	resw 1			; Free Base Memory (kilobytes)
+    75                              <1> 		absolute 0462h
+    76 00000462 <res 00000001>      <1> BIOS_page	resb 1			; Current video page
+    77                              <1> 		absolute 046Ch
+    78 0000046C <res 00000002>      <1> BIOS_timer	resw 1			; Timer ticks
+    79                              <1> 		absolute 0472h
+    80 00000472 <res 00000002>      <1> BIOS_magic	resw 1			; BIOS reset magic
+    81                              <1>                 absolute 0484h
+    82 00000484 <res 00000001>      <1> BIOS_vidrows    resb 1			; Number of screen rows
+    83                              <1> 
+    84                              <1> %endif ; _BIOS_INC
+    85                                  	
+    86                                  ;
+    87                                  ; Note: The MBR is actually loaded at 0:7C00h, but we quickly move it down to
+    88                                  ; 0600h.
+    89                                  ;
+    90                                  		section .text
+    91                                  		cpu 8086
+    92                                  		org 0600h
+    93                                  
+    94 00000000 FA                      _start:		cli
+    95 00000001 31C0                    		xor ax,ax
+    96 00000003 8ED8                    		mov ds,ax
+    97 00000005 8EC0                    		mov es,ax
+    98 00000007 8ED0                    		mov ss,ax
+    99 00000009 BC007C                  		mov sp,7C00h
+   100 0000000C FB                      		sti
+   101 0000000D FC                      		cld
+   102 0000000E 89E6                    		mov si,sp		; Start address
+   103 00000010 BF0006                  		mov di,0600h		; Destination address
+   104 00000013 B90001                  		mov cx,512/2
+   105 00000016 F3A5                    		rep movsw
+   106                                  
+   107                                  ;
+   108                                  ; Now, jump to the copy at 0600h so we can load the boot sector at 7C00h.
+   109                                  ; Since some BIOSes seem to think 0000:7C00h and 07C0:0000h are the same
+   110                                  ; thing, use a far jump to canonicalize the address.  This also makes
+   111                                  ; sure that it is a code speculation barrier.
+   112                                  ;
+   113                                  
+   114 00000018 EA[1D00]0000            		jmp 0:next		; Jump to copy at 0600h
+   115                                  				
+   116                                  next:
+   117 0000001D 88160008                		mov [DriveNo], dl		; Drive number stored in DL
+   118                                  ;
+   119                                  ; Check for CHS parameters.  This doesn't work on floppy disks,
+   120                                  ; but for an MBR we don't care.
+   121                                  ;
+   122 00000021 B408                    		mov ah,08h			; Get drive parameters
+   123 00000023 CD13                    		int 13h
+   124 00000025 31C0                    		xor ax,ax
+   125 00000027 88F0                    		mov al,dh
+   126 00000029 40                      		inc ax				; From 0-based to count
+   127 0000002A A3[F000]                		mov [Heads],ax
+   128 0000002D 80E13F                  		and cl,3Fh			; Max sector number
+   129 00000030 880E[F200]              		mov [Sectors],cl
+   130                                  		; Note: we actually don't care about the number of
+   131                                  		; cylinders, since that's the highest-order division
+   132                                  
+   133                                  ;
+   134                                  ; Now look for one (and only one) active partition.
+   135                                  ;
+   136 00000034 BE[BE01]                		mov si,PartitionTable
+   137 00000037 31C0                    		xor ax,ax
+   138 00000039 B90400                  		mov cx,4
+   139                                  checkpartloop:
+   140 0000003C F60480                  		test byte [si],80h
+   141 0000003F 7403                    		jz .notactive
+   142 00000041 40                      		inc ax
+   143 00000042 89F7                    		mov di,si
+   144 00000044 83C610                  .notactive:	add si,byte 16
+   145 00000047 E2F3                    		loop checkpartloop
+   146                                  
+   147 00000049 83F801                  		cmp ax,byte 1			; Better be only one
+   148 0000004C 7573                    		jnz not_one_partition
+   149                                  
+   150                                  ;
+   151                                  ; Now we have the active partition partition information in DS:DI.
+   152                                  ; Check to see if we support EBIOS.
+   153                                  ;
+   154 0000004E 8A160008                		mov dl,[DriveNo]
+   155 00000052 B80041                  		mov ax,4100h
+   156 00000055 BBAA55                  		mov bx,055AAh
+   157 00000058 31C9                    		xor cx,cx
+   158 0000005A 30F6                    		xor dh,dh
+   159 0000005C F9                      		stc
+   160 0000005D CD13                    		int 13h
+   161 0000005F 7223                    		jc no_ebios
+   162 00000061 81FB55AA                		cmp bx,0AA55h
+   163 00000065 751D                    		jne no_ebios
+   164 00000067 F6C101                  		test cl,1			; LBA device access
+   165 0000006A 7418                    		jz no_ebios
+   166                                  ;
+   167                                  ; We have EBIOS.  Load the boot sector using LBA.
+   168                                  ;
+   169 0000006C 57                      		push di
+   170 0000006D BE[E000]                		mov si,dapa
+   171 00000070 8B5D08                  		mov bx,[di+8]			; Copy the block address
+   172 00000073 895C08                  		mov [si+8],bx
+   173 00000076 8B5D0A                  		mov bx,[di+10]
+   174 00000079 895C0A                  		mov [si+10],bx
+   175 0000007C 8A160008                		mov dl,[DriveNo]
+   176 00000080 B442                    		mov ah,42h			; Extended Read
+   177 00000082 EB2A                    		jmp short common_tail
+   178                                  ;
+   179                                  ; No EBIOS.  Load the boot sector using CHS.
+   180                                  ;
+   181                                  no_ebios:
+   182 00000084 57                      		push di
+   183 00000085 8B4508                  		mov ax,[di+8]
+   184 00000088 8B550A                  		mov dx,[di+10]
+   185 0000008B F736[F200]              		div word [Sectors]
+   186 0000008F 42                      		inc dx
+   187 00000090 89D1                    		mov cx,dx			; Sector #
+   188 00000092 31D2                    		xor dx,dx
+   189 00000094 F736[F000]              		div word [Heads]
+   190                                  		; DX = head #, AX = cylinder #
+   191 00000098 88C5                    		mov ch,al
+   192 0000009A D1E8                    		shr ax,1
+   193 0000009C D1E8                    		shr ax,1
+   194 0000009E 24C0                    		and al,0C0h
+   195 000000A0 08C1                    		or cl,al
+   196 000000A2 88D6                    		mov dh,dl			; Head #
+   197 000000A4 8A160008                		mov dl,[DriveNo]
+   198 000000A8 BB007C                  		mov bx,7C00h
+   199 000000AB B80102                  		mov ax,0201h			; Read one sector
+   200                                  common_tail:
+   201 000000AE CD13                    		int 13h
+   202 000000B0 7216                    		jc disk_error
+   203 000000B2 5E                      		pop si				; DS:SI -> partition table entry
+   204                                  ;
+   205                                  ; Verify that we have a boot sector, jump
+   206                                  ;
+   207 000000B3 813EFE7D55AA            		cmp word [7C00h+510],0AA55h
+   208 000000B9 7508                    		jne missing_os
+   209 000000BB FA                      		cli
+   210 000000BC EA007C0000              		jmp 0:7C00h			; Jump to boot sector; far
+   211                                  						; jump is speculation barrier
+   212                                  						; (Probably not neecessary, but
+   213                                  						; there is plenty of space.)
+   214                                  
+   215                                  not_one_partition:
+   216 000000C1 7705                    		ja too_many_os
+   217                                  missing_os:
+   218 000000C3 BE[F400]                		mov si,missing_os_msg
+   219 000000C6 EB03                    		jmp short die
+   220                                  too_many_os:
+   221                                  disk_error:
+   222 000000C8 BE[0F01]                		mov si,bad_disk_msg
+   223                                  die:
+   224                                  .msgloop:
+   225 000000CB AC                      		lodsb
+   226 000000CC 20C0                    		and al,al
+   227 000000CE 740C                    		jz .now
+   228 000000D0 B40E                    		mov ah,0Eh			; TTY output
+   229 000000D2 8A3E6204                		mov bh,[BIOS_page]		; Current page
+   230 000000D6 B307                    		mov bl,07h
+   231 000000D8 CD10                    		int 10h
+   232 000000DA EBEF                    		jmp short .msgloop
+   233                                  .now:
+   234 000000DC EBFE                    		jmp short .now
+   235                                  
+   236 000000DE 00<rept>                		align 4, db 0			; Begin data area
+   237                                  
+   238                                  ;
+   239                                  ; EBIOS disk address packet
+   240                                  ;
+   241                                  dapa:
+   242 000000E0 1000                    		dw 16				; Packet size
+   243 000000E2 0100                    .count:		dw 1				; Block count
+   244 000000E4 007C                    .off:		dw 7C00h			; Offset of buffer
+   245 000000E6 0000                    .seg:		dw 0				; Segment of buffer
+   246 000000E8 00000000                .lba:		dd 0				; LBA (LSW)
+   247 000000EC 00000000                		dd 0				; LBA (MSW)
+   248                                  
+   249                                  ; CHS information
+   250 000000F0 0000                    Heads:		dw 0
+   251 000000F2 0000                    Sectors:	dw 0
+   252                                  
+   253                                  ; Error messages
+   254 000000F4 4D697373696E67206F-     missing_os_msg	db 'Missing operating system', 13, 10, 0
+   255 000000FD 7065726174696E6720-
+   256 00000106 73797374656D0D0A00 
+   257 0000010F 4F7065726174696E67-     bad_disk_msg	db 'Operating system loading error', 13, 10, 0
+   258 00000118 2073797374656D206C-
+   259 00000121 6F6164696E67206572-
+   260 0000012A 726F720D0A00       
+   261                                  
+   262                                  ;
+   263                                  ; Maximum MBR size: 446 bytes; end-of-boot-sector signature also needed.
+   264                                  ; Note that some operating systems (NT, DR-DOS) put additional stuff at
+   265                                  ; the end of the MBR, so shorter is better.  Location 440 is known to
+   266                                  ; have a 4-byte attempt-at-unique-ID for some OSes.
+   267                                  ;
+   268                                  
+   269                                  PartitionTable	equ $$+446			; Start of partition table
+   270                                  
+   271                                  ;
+   272                                  ; BSS data; put at 800h
+   273                                  ;
+   274                                  DriveNo		equ 0800h

@@ -1,0 +1,400 @@
+XFDisk I Version 0.9.3 Beta DE
+==============================================================================
+History
+
+Legende:
+------------------------------------------------------------------------------
++ Feature hinzugekommen
+- Feature entfernt
+* Bugfix
+! Known Bug
+# Interne Aenderung
+
+
+XFDisk I Version 0.9.3 Beta DE
+------------------------------------------------------------------------------
+* Groesse des Bootmanagers wurde reduziert und Bootmanager wurde ans Ende
+  des ersten Kopfes verschoben (n Sektoren/Kopf -> CHS 0/0/n-13 bis 0/0/n)
+  Dies sollte Probleme mit HighPoint/Abit IDE Adaptern beheben.
+
+
+XFDisk I Version 0.9.2 Beta DE
+------------------------------------------------------------------------------
+* Bootmanager hat nach Ablauf der Wartezeit versucht, von Floppy zu booten,
+  wenn ein einfaches Menue eingestellt war
+# erweiterte INT13-BIOS-Funktionen werden nur dann genutzt, wenn dadurch mehr
+  als ein Zylinder zusaetzlich verfuegbar ist (wg. Problemen mit alten SCSI-
+  Systemen)
+
+
+XFDisk I Version 0.9.1 Beta DE
+------------------------------------------------------------------------------
++ bei Initialisierung vom Partitionsbereich kann dieser wahlweise vollstaendig
+  geloescht werden
+# /NOINIT-Schalter entfallen. Abfrage, ob Partitionsbereich initialisiert
+  werden soll, erfolgt nun ueber das Menue
+# /PQMAGIC-Schalter entfallen. XFDisk arbeitet jetzt immer in diesem Modus.
+# /AUTOHIDE-Schalter in INI-Datei standardmaessig aktiviert
+! XFDisk Bootmanager wird ueberschrieben von OS/2 Warp 5 Server und BIOS-
+  Einstellungen von HighPoint/Abit IDE Adaptern, da diese denselben "freien"
+  Bereich der Festplatte nutzen wie XFDisk
+Aenderungen von Build 318:
++ XFDisk prueft beim installiertem Bootmanager, ob der XFDisk-MBR installiert
+  ist
++ XFDisk ueberschreibt nicht mehr bei jedem Aktualisieren des Bootmanagers
+  die Einstellungen von Partition Magic
+* /PQMAGIC-Modus war faelschlicherweise nicht aktiviert
+Aenderungen von Build 319:
+* Pruefung des MBR korrigiert
+* Prozentanzeige bei Initialisierung korrigiert
+Aenderungen von Build 320:
+* arithmetischer Ueberlauf bei Initialisierung grosser Partitionen behoben
+Aenderungen von Build 321:
++ Bootmanager: bei Booten von Floppy mit F2 wird Partitionstabelle so
+  angepasst, als ob gewaehlte Partition gebootet wird.
+
+
+XFDisk I Version 0.9.0 Beta DE
+------------------------------------------------------------------------------
++ XFDisk unterstuetzt nun mehrere sichtbare primaere Partitionen. Der Boot-
+  manager versteckt diese nicht mehr voreinander. Mit dem Kommandozeilen-
+  parameter /AUTOHIDE verhaelt sich XFDisk wie bisher und versteckt die
+  primaeren Partitionen voreinander
++ Der Bootmanager laesst sich installieren, ohne die Partitionstabellen zu
+  veraendern. Aenderungen an den Partitionstabellen lassen sich fr jede
+  Festplatte einzeln auswaehlen.
++ XFDisk aendert die Reihenfolge bestehender Partitionen in der Partitions-
+  tabelle standardmaessig nicht mehr. Dies kann mit dem Parameter /SORT
+  erzwungen werden.
+# Der Bootmanager wird wieder verschluesselt, damit Partition Magic seine
+  Konfiguration nicht im Datenbereich des Bootmanagers ablegt.
+Aenderungen gegenueber den Alphaversionen:
+* Build 314: der Bootmanager sollte das Activ-Flag der Partitionstabelle
+  jetzt wieder richtig setzen
++ Build 314: bei Prfsummenfehler wird der Bootmanager nicht mehr
+  deinstalliert
+* Build 315: Zuweisung der Laufwerksbuchstaben korrigiert, fuehrte zur
+  Meldung ueber Speichermangel
+* Build 316: beim Sichtbarmachen einer Partition werden andere Partitionen
+  nur im /AUTOHIDE-Modus automatisch versteckt
+
+
+XFDisk I Version 0.8.5 Beta DE
+------------------------------------------------------------------------------
+* Bootmanager gibt nur noch eine Warnung aus, wenn Bootcode modifiziert wurde,
+  da Partition Magic manchmal ungefragt den Datenbereich modifiziert
+
+
+XFDisk I Version 0.8.4 Beta DE
+------------------------------------------------------------------------------
++ Kommandozeilenparameter /NOWIN9X, /OS2, /WINNT und /LINUX hinzugefuegt,
+  um Steuerung der standardmaessig verwendeten Partitionstypen zu ermoeglichen
+
+
+XFDisk I Version 0.8.3 Beta DE
+------------------------------------------------------------------------------
++ Kommandozeilenparameter koennen in der Datei XFDISK.INI angegeben werden
++ Kommandozeilenparameter /PQMAGIC aktiviert Power Quest Partition Magic
+  Kompatibilitaet
++ Menue fuer die wichtigsten Partitionstypen implementiert
++ Partitionierung und Konfiguration kann gesichert/geladen werden
++ Bootmanager um einfache Menues erweitert
++ Zuletzt im Bootmanager ausgewaehlte Partition kann mit XFDisk geaendert
+  werden (ermoeglicht zusammen mit "Auswahl merken" Wahl der zu bootenden
+  Partition ohne die Reihenfolge im Menue zu aendern)
++ Master- und Partitionspasswoerter werden bei allen manipulativen Funktionen
+  von XFDisk einmal pro Session abgefragt
+* Ende einer erweiterten Partition wird immer durch hinterstes logisches
+  Laufwerk bestimmt, nicht mehr durch freien Bereich, der fuer logische 
+  Laufwerke reserviert ist.
+# Code fuer die Menues geaendert
+# Versionsschema geaendert... mal wieder... ;-)
+
+
+XFDisk I Version 0.8.2 Beta DE
+------------------------------------------------------------------------------
++ Kommandozeilenparameter /NOINIT deaktiviert Initialisierung neuer
+  Partitionen fuer Wiederherstellungszwecke
+* erweiterte Partitionen mit freien Bereichen wurden mit falscher Groesse
+  in die Partitionstabelle eingetragen
+
+
+XFDisk I Version 0.8.1 Beta DE
+------------------------------------------------------------------------------
+* erweiterte Partitionen, die am Ende der Festplatte liegen, wurden immer
+  als "erweiterte Partitionen mit Int13X" in der Partitionstabelle eingetragen
+* Verkettung in erweiterten Partitionen mit Int13X korrigiert  
+* Initialisierung neuer Partitionen korrigiert
+
+
+XFDisk I Version 0.8.0 Beta DE
+------------------------------------------------------------------------------
++ Unterstuetzung von Festplatten >8 GB durch erweiterte INT13-BIOS-Funktionen
+* Wenn die erweiterte Partition leer war, ist XFDisk abgestuerzt
+* Wenn eine erweiterte Partition auf Zylinder 0 anfing, wurden die Partitions-
+  sektoren der logischen Laufwerke falsch zurueckgeschrieben
+# Code zum Einlesen der Partitionstabelle geaendert
+# Code zum Ausrichten neuer Partitionen geaendert
+
+
+XFDisk I Version 0.7.0 Beta DE - GPL
+------------------------------------------------------------------------------
+# XFDisk wird nun unter der GNU General Public License vertrieben (GPL.TXT).
+  Das Original der GPL steht im Internet unter der Adresse
+  	http://www.gnu.org/copyleft/gpl.html
+  Den Quellcode von XFDisk koennen Sie im Internet unter der Adresse
+  	http://home.pages.de/~f.painke/
+  herunterladen.
+
+
+XFDisk I Version 0.7.0 Beta DE
+------------------------------------------------------------------------------
++ Der Bootmanager merkt sich jetzt auf Wunsch die gebootete Partition
+* Beim aktivieren einer Partition wurden alle Partitionen der jeweils anderen
+  Festplatten deaktiviert
+* Je nach Festplatte kam es nach wie vor zu Fehlern beim Formatieren und zu
+  Geisterlaufwerken, wenn eine Partition mit anderer Groesse an der selben
+  Stelle wie eine alte angelegt wurde (siehe 1.05 Beta 3)
+* Partitionen mit mehr als 2 GB werden per Default als FAT32 angelegt
+# Umstellung des Codes zum Schreiben auf/Lesen von Festplatte.
+
+XFDisk kann nach wie vor nur korrekt mit Festplatten verwendet werden, die
+innerhalb der BIOS INT13 Grenzen liegen. Ueberschreitet die Kapazitaet der
+Platte dieses Limit, kommt es zu Laufzeitfehlern (Runtime Error) oder zu un-
+sinnigen Partitionierungen.
+Fuer aeltere Systeme liegt diese Grenze bei 504 MB, bei neueren Systemen kann
+die Grenze je nach BIOS bei 1008 MB, 2016 MB, 4032 MB oder 8064 MB liegen.
+Mit einem Diskmanager kann diese Grenze bis auf 8064 MB heraufgesetzt werden,
+allerdings ist XFDisk nicht mit allen Diskmanagern einsetzbar. Kommt es zu
+Problemen zwischen XFDisk und dem Diskmanager, sind Datenverluste meist nicht
+mehr zu vermeiden. Nach Erfahrungsberichten laeuft XFDisk zumindest mit neuen
+Versionen des ONTRAC DiskManagers problemlos. Garantie hierfuer uebernimmt
+jedoch weder der Autor von XFDisk noch der Hersteller des ONTRAC DiskManagers!
+
+
+XFDisk I Version 0.6.0 Beta DE
+------------------------------------------------------------------------------
++ Bootpartition wird immer aktiviert
+* Borland CRT Delay Bug wurde durch Austausch der TPL Dateien behoben
+* Beim Loeschen eines logischen Laufwerkes wurde in einigen Faellen die
+  gesamte erweiterte Partition geloescht
+* Bootparameter (DS:SI, SS:BP) werden korrekt uebergeben (SCO)
+* Bei kleineren Festplatten konnte die Partitionstabelle nicht geschrieben
+  werden.
+# Partitionstabelle wird wieder sortiert
+# Versionsschema geaendert
+
+Dies ist im wesentlichen die Version 1.05 Beta 4, basierend auf der Build 226.
+Es ist auch eine Version 1.05 Beta 4, Build 229 im Umlauf, die die hier unter
+der XFDisk I Version 0.6.0 Beta DE aufgelisteten Bugfixes und Aenderungen
+enthaelt.
+Der wesentliche Unterschied zwischen den beiden Versionen ist, dass saemtliche
+Meldungen ausgelagert wurden, um eine Uebersetzung zu vereinfachen.
+
+
+Version 1.05 Beta 4
+------------------------------------------------------------------------------
++ Bootpartition wird immer aktiviert
+* Bootparameter (DS:SI, SS:BP) werden korrekt uebergeben (SCO)
+
+
+Version 1.05 Beta 3
+------------------------------------------------------------------------------
++ Reboot unter Windows 95 nun moeglich
++ Kommandozeilen Option /BLIND eingebaut (Blindenunterstuetzung)
+- STRG-C/STRG-BRK wird ignoriert
+* Bug im Code fuer die "BootManager installieren" Funktion gefixt
+  (Runtime Error 204, wenn der BootManager geschrieben wird)
+* Die jeweils ersten Sektoren des gesamten ersten Head werden beim Anlegen
+  einer neuen Partition geloescht (Probleme in seltenen Faellen mit DOS
+  FORMAT sollten dadurch behoben sein)
+* Bug im Code fuer die "BootManager aktualisieren" Funktion gefixt
+* Bei installiertem Floppy- und/oder Masterpasswort wurde die Checksumme beim
+  Einlesen der Partitionstabelle nicht richtig kalkuliert
+* Strengere Ueberpruefung des BootManagers auf Gueltigkeit
+* Bug im Code fuer neue/lowlevel formatierte Festplatten gefixt
+# InfoBoxen hinzugefuegt
+# BootManager wird erst installiert, deinstalliert oder aktualisiert, wenn
+  XFDisk mit F3 beendet wird
+# Partitionstabelle wird nicht mehr umsortiert
+
+
+Version 1.05 Beta 2
+------------------------------------------------------------------------------
+* Bei der Abfrage zum Neustart des Rechners waren Ja und Nein vertauscht
+
+
+Version 1.05 Beta 1
+------------------------------------------------------------------------------
++ XFDisk kann voll unter Windows 95 eingesetzt werden
++ Bildschirm kann vor dem Anzeigen des BootMenues geloescht werden
++ Zeitlimit Verhalten bei Tastendruck ist frei waehlbar
++ Mehrere sichtbare Partitionen auf einer Platte werden automatisch versteckt
++ Kontollierter Abbruch beim Testen durch STR-C/STRG-BRK moeglich, ohne die
+  Aenderungen auf die Platte zu sichern (Deinstalliert bei Bedarf den Boot-
+  Manager automatisch, der Hinweis auf fehlende Eintraege entfaellt)
++ BootManager kann aktualisiert werden (die Umstaendliche Prozedur beim
+  Update auf eine neue Version entfaellt hiermit, alte Einstellungen gehen
+  nicht verloren)
++ Passwortprotektion der Eintraege im BootMenue moeglich
++ Partitionstyp kann veraendert werden
++ Kommandozeilen Option /MBR eingebaut
++ Neue / low level formatierte Platten koennen partitioniert werden
++ Partitionstypen von Windows 95 hinzugefuegt
+* BootManager Bug mit unbekannten Partitionstypen gefixt
+* Partitionstabelle wird nicht mehr geschrieben, wenn nur der BootManager
+  geaendert wurde
+* BootManager wird nicht mehr geschrieben, wenn nur die Partitionstabelle
+  geaendert wurde
+* Anzahl der Eintraege im BootMenue wird ueberprueft
+* Logische Laufwerke am Anfang der Festplatte werden nun richtig gehandhabt
+* Es koennen nun wieder vier primaere Partitionen angelegt werden, wenn auf
+  der anderen Platte bereits logische Laufwerke existieren
+! XFDisk kann nicht mit Festplatten umgehen, die mehr als 1024 Zylinder haben
+! Einige Betriebssysteme koennen nicht gebootet werden (z.B. Solaris, QNX)
+# Readme auf den neuesten Stand gebracht
+# Menues und Oberflaeche leicht ueberarbeitet und optisch gegliedert
+# Hilfe erweitert und ueberarbeitet
+# Checksummenalgorithmus optimiert, sollte nun auch von Diskette vernuenftig
+  laufen (Wartezeit beim Starten)
+# Versionsschema geaendert - hoffentlich zum letzten Mal... ;)
+# Name geaendert (vormals XFDISK & BootManager)
+
+
+Version D-1.0.4
+------------------------------------------------------------------------------
++ OS/2 ist nun von einer erweiterten Partition oder zweiten Platte bootbar.
++ Die Reihenfolge der Eintraege im BootManager Menue ist nun ersichtlich.
+- F2 booten von Diskette B: wurde wieder entfernt.
+* Ausgewaehlte FAT/HPFS/NTFS primaere Partition wird als aktiv markiert.
+* Partitionsanzeige im BootManager Menue korrigiert. (Teilweise unsinnige
+  Anzeige)
+* Versteckte Partitionen (FAT/HPFS/NTFS) wurden beim booten nicht korrigiert.
+* Beenden ohne Speichern der Veraenderungen fuehrte unter gewissen Umstaenden
+  zu unkontrolliertem Abbruch.
+* Wenn XFDISK mit dem R/O Attribut schreibgeschuetzt wurde, konnte es die
+  Checksumme nicht berechnen.
+* Die Eingabedialoge wurden leicht abgeaendert: Die Laenge des Eingabefeldes
+  ist jetzt proportional zur maximalen Laenge der einzugebenden Daten und die
+  Taste DEL wird am Ende der Eingabezeile nur noch einfach verarbeitet.
+* F5 setzt das Timeout voruebergehend aus. (Der Befehl wurde leicht geaendert:
+  wird F5 gedrueckt, waehrend der BootManager ausgeblendet ist, wird er wieder
+  eingeblendet und nicht sofort wieder ausgeblendet, alle anderen Tasten
+  blenden den BootManager wieder ein, werden aber verarbeitet, wie normal.)
+* Geloeschte Eintraege verwirren das BootManager Menue nicht mehr.
+  (Mehrfacheintraege/geloschte Eintraege erschienen weiterhin)
+* Die Eintraege des OS/2 Boot Managers in der erweiterten Partitionstabelle
+  werden nicht mehr ueberschrieben.
+* Bootsektor wird beim neuanlegen geloescht.
+  (Fehler beim Formatieren nach Umpartitionierung)
+* Umstellung des MBR Codes wegen fehlverhalten von Windows NT 4.0.
+# MessageBox Routine ueberarbeitet und Texte erneut angepasst.
+# InputBox Routine ueberarbeitet und um die Tasten Links/Rechts, Pos1, Ende
+  Einfg und Entf erweitert. (Cursornavigation, Insert/Overwrite Modus).
+# Aussehen des BootManager Menue leicht ueberarbeitet.
+# Umfang der erkannten Partitonstypen erweitert.
+# BootManager und Partitionstabelle werden getrennt geschrieben.
+  (Kein Reboot mehr notwendig nach Aenderung des BootManager Menues)
+# Reboot nach Aenderung der Partitionstabelle nicht mehr obligat.
+# Versionsschema auf mehrfache Anfrage geaendert. XFDISK & BootManager erhaelt
+  jetzt fuer jede neue, oeffentlich freigegebene Version eine eigene Versions-
+  nummer, damit eine eindeutige Unterscheidung moeglich wird.
+  Naeheres dazu in der README.TXT
+# Umstellung zurueck zu TASM 3.2, bitte evtl. Bugs melden...
+
+
+Version 1.0C 01.12.1996
+------------------------------------------------------------------------------
++ F5 blendet den BootManager bis zum naechsten Tastendruck aus
+  (Der naechste Tastendruck wird allerdings verarbeitet!)
+* Ein Wert fuer Timeout von 0 deaktiviert die Tiemoutfunktion
+* Ein Wert fuer Timeout zwischen 1..9 ist jetzt nicht mehr moeglich
+* Wartezeit am Anfang entfernt (Startmeldung XFDISK, Probleme mit Cyrix CPUs)
+* Zweite Platte wurde nicht richtig angezeigt
+# Umstellung auf kompakteren ASM Code.
+! WindowsNT 4.0 (Work Station & Server) funktionieren im Zusammenspiel mit dem
+  BootManager nicht korrekt.
+
+
+Version 1.0C 14.11.1996
+------------------------------------------------------------------------------
+# XFDISK & BootManager sind jetzt FreeWare.
+# Genauere Ueberpruefung des Schreibvorganges.
+# Ueberarbeitung der Textdateien
+
+
+Version 1.0B 12.11.1996
+------------------------------------------------------------------------------
+* Boeser Bug beim Schreiben der erweiterten Partition behoben.
+  (fuehrte zu Fehlermeldung "Fehler beim Schreiben der erweiterten Partition"
+   und zu unsinnigen Eintraegen in der Partitionstabelle.)
+* Treten Fehler waehrend des Schreibens der Partitionstabelle oder des Boot
+  Managers auf, wird der Programmverlauf angehalten.
+
+
+Version 1.0B 10.11.1996
+------------------------------------------------------------------------------
++ Registrierung ab dieser Version moeglich
+* Zeitlimit fuer den BootManager bei der Eingabe auf 60 Sekunden begrenzt
+* Wenn ein logisches Laufwerk geloescht wurde, ist der interne Zaehler fuer
+  die Eintraege im BootManager dekrementiert worden auch wenn das Laufwerk
+  gar nicht im BootManager eingetragen war.
+  (Fehlermeldung: Keine Standardpartition definiert)
+* Ueberpruefung des Laufwerkseintrages im BootManager Menue
+  (Ueberschneidungen bei Eintraegen im Bootmanager mit gleicher Startposition
+  und Groesse)
+# Messageboxen im Text angepasst
+! Wenn im System-BIOS Virenschutz aktiviert ist und XFDISK die Partitions-
+  tabelle nicht richtig schreiben kann, kann es zu Endlosverkettung der
+  erweiterten Partition kommen.
+
+
+Version 1.0B 03.11.1996
+------------------------------------------------------------------------------
+# Checksummenfunktion in den BootManager integriert
+
+
+Version 1.0B 01.11.1996
+------------------------------------------------------------------------------
+ACHTUNG!!! Durch die internen Umstellungen ist der Bootmanager nicht mehr
+           mit den Vorhergehenden Versionen kompatibel und muss ggf. neu
+           installiert werden.
+
++ MBR ist jetzt auch fuer Nicht-Bootmanager Betrieb ausgelegt, d.h. fuer die
+  naechste Version ist geplant, auch neue Platten einrichten zu koennen
+# Umstellung auf gecrypteten Menueteil
+# Interne Struktur erweitert und fuer Passwortaufnahme vorbereitet, d.h.
+  fuer die naechste Version ist frei konfigurierbarer Passwortschutz geplant
+  (Sowohl MasterPWD als auch BootPWDs fuer die jeweiligen Partitionen)
+
+
+Version 1.0A 29.10.1996
+------------------------------------------------------------------------------
++ Booten von Diskette (F1 -> A:, F2 -> B:)
+* Erweiterte Partitionen wurden nicht richtig angelegt, wenn ein Zwischenraum
+  entstand (Log, Free, Log ergab zwei erweiterte Partitionen)
+
+
+Version 1.0A 28.10.1996
+------------------------------------------------------------------------------
+* Hoffentlich endgueltig beseitigter Bug, der das beschreiben mehrerer Fest-
+  platten betraf (Partitionstabelle wurde nicht richtig geschrieben, Boot-
+  manager funktionierte nicht, etc. pp.)
+# BootManager umbenannt...
+
+
+Version 1.0 BETA 04.02.1995
+------------------------------------------------------------------------------
+* Endlosverkettung der erweiterten Partition weitestgehend bereinigt.
+! Kann nur eine Festplatte richtig einrichten, bei einer zweiten HDD im System
+  kommt es mit ziemlicher Wahrscheinlichkeit zu Datenverlusten.
+
+Diese Version war eigentlich nur fuer den geschlossenen Betatest gedacht, ist
+aber irgendwo "durchgerutscht".
+
+
+Version 0.0
+------------------------------------------------------------------------------
+! Kann keine logischen Laufwerke anlegen, es kommt zur Endlosverkettung der
+  erweiterten Partition.
+==============================================================================

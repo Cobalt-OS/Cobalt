@@ -1,0 +1,119 @@
+Numerous programs are now available to create and ISO CD image.  Most of these
+can be used in lieu of the CDCACHER program.  The SHSUCDX SHSUCDHD combination 
+allows you to mount these images as drives under DOS.
+
+
+                         SHSUCDHD Version 2.0
+                         CDCACHER Version 5.0
+                        (c) John H. McCoy, May 1996
+                   Sam Houston St. Univ., TX 77341-2206
+
+******************************************************************************
+
+                            Warning!!!!
+
+Use at your own risk.  Both SHSUCDHD and CDCACHER use features of DOS
+    that are undocumented.
+
+SHSUCDHD will NOT work with either Microsoft's or IBM's MSCDEX programs.
+Your system will crash if you try it.  MSCDEX trashes itself on an
+unexpected INT2F broadcast call that it should ignore.
+
+******************************************************************************
+
+SHSUCDHD is an experimental CD rom driver which loads with the name SHSU-CDH
+and makes up to 5 CD ROM images which have been cached to hard disk appear as
+devices 0 through 4.
+
+CDCACHER makes cached images of ISO9660 or High Seria format CD ROMS for use
+by either the network CD ROM server program SHSUSERV or the pseudo CD ROM
+driver SHSUCDHD.  CD ROMs are ususally large and it takes a while.  It will
+run in an OS2 DOS window while you do something else.
+
+CDHD has been used under DOS 4.0 and later and WIN 3.1 on a non-networked
+system using cache files on the local drive, on a Novell client using VLMs
+with the cache files on a netware server and on a NT client with the cache
+files on a NT server.  It cannot be used to access cached images from a
+network on a Novell NET(x) shell client.  It may work with other networks
+which use a real mode re-director for network access but I have not tested it.
+
+SHSUCDX must be used if a program requires the cdrom extensions.  CDHD will
+not work with either Microsoft's or IBM's MSCDEX.  It will crash the system.
+
+
+The command to run SHSUCDHD is:
+
+   SHSUCDHD [/F:imagepathname1 [/F:imagepathname2 ...]] [/U] [/?]
+
+     up to five cache image files may be specified
+
+   example:  SHSUCDHD /F:.\CD.IMG
+             SHSUCDX /D:SHSU-CDH
+
+     uses the cache file CD.IMG in the current directory and assigns it
+        the next available drive letter
+
+   example:  SHSUCDHD /F:CD0.IMG  /F:N:\CD1.IMG
+             SHSUCDX /D:SHSU-CDH,E
+
+     uses the cache file CD0.IMG in the current directory append path and
+        CD1.IMG from the N drive and assigns the next available drive letters
+        beginning with letter E ( probably E and F)
+
+    example:  SHSUCDX /U
+              SHSUCDHD /U
+
+        unloads SHSUCDX then SHSUCDHD from memory
+
+The command to run CDCACHER is:
+
+   CDCACHER [cd driver name] [/?]
+
+      cd driver name is the name of the CD driver where the CD ROM being
+         cached is located.  If none is specified MSCD001 is assumed.
+         If the specified driver is not found the user is given the
+         opportunity to interactively edit the driver name.
+
+    example:  CDCACHER
+
+        starts CDCACHER using the default driver name MSCD001
+
+    example:  CDCACHER SHSU-CDN
+
+        starts CDCACHER using the driver name SHSU-CDN.
+
+
+To see if SHSUCDHD will work on your system.
+
+   Unzip all files into the same directory.
+
+   Run SHSUCDHD by entering SHSUCDHD /F:SHSUDRV1.IMG{Enter}
+
+   Run SHSUCDX by entering SHSUCDX /D:SHSU-CDH and note the CD drive letter
+
+   Run the HELLO program from the CD by entering drive:\HELLO\HELLO where
+      drive is the drive letter noted in the previous step
+
+   If the above works, then unload SHSUCDX and SHSUCDHD.  Copy the cache image
+   file SHSUDRV1.IMG to your network file server.
+
+   Run SHSUCDHD by entering CDHD /F:path\SHSUDRV1.IMG where path is the network path.
+
+   Run SHSUCDX by entering SHSUCDX /D:SHSU-CDH and note the CD drive letter
+
+   Run the HELLO program from the CD by entering drive:\HELLO\HELLO where
+      drive is the drive letter noted in the previous step
+
+   If this works then SHSUCDHD is probably compatable with your system.  Use
+   CDCACHER to make cache images of your CD.
+
+
+
+SHSUCDHD and CDCACHER are a copyright reserved, free use program.
+
+Use at your own risk.
+
+Time permitting, an attempt will be made to fix problems that are reported
+  to CSC_JHM@SHSU.EDU.
+
+(c)John H. McCoy, 1995 1996, Sam Houston St. Univ., TX 77341-2206

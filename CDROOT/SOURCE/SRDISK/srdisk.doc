@@ -1,0 +1,942 @@
+
+                              SRDISK (TM)
+                    ReSizeable RAMDisk version 2.09
+                         for XMS and EMS memory
+
+                 Copyright (C) 1991-1996, 2005 Marko Kohtala
+                          All rights reserved
+
+
+
+CONTENTS
+
+  1. Disclaimer of warranty
+  2. License
+  3. Features included
+  4. Files in this release
+  5. Usage
+  5.1. Basic installation
+  5.2. SRDISK device driver
+  5.2.1. XMS memory device driver
+  5.2.2. EMS memory device driver
+  5.2.3. EMS 3.2 memory device driver
+  5.3. SRDUMMY device driver
+  5.4. SRDISK program
+  5.4.1 SRDISK sample commands
+  5.4.2 SRDISK command line options
+  6. Troubleshooting
+  7. Frequently asked questions and answers
+  8. Trademarks
+  9. Last words
+
+
+
+                       1. DISCLAIMER OF WARRANTY
+
+THIS SOFTWARE AND MANUAL ARE PROVIDED "AS IS" AND WITHOUT WARRANTIES AS 
+TO PERFORMANCE OF MERCHANTABILITY OR ANY OTHER WARRANTIES WHETHER 
+EXPRESSED OR IMPLIED.  BECAUSE OF THE VARIOUS HARDWARE AND SOFTWARE 
+ENVIRONMENTS IN WHICH THIS PROGRAM MAY BE USED, NO WARRANTY OF FITNESS 
+FOR A PARTICULAR PURPOSE IS OFFERED.
+
+GOOD DATA PROCESSING PROCEDURE DICTATES THAT ANY PROGRAM BE THOROUGHLY
+TESTED WITH NON-CRITICAL DATA BEFORE RELYING ON IT.  THE USER MUST
+ASSUME THE ENTIRE RISK OF USING THE PROGRAM.  ANY LIABILITY OF THE
+SELLER WILL BE LIMITED EXCLUSIVELY TO PRODUCT REPLACEMENT OR REFUND OF
+PURCHASE PRICE.
+
+
+
+                               2. LICENSE
+
+This software is NOT public domain. It is copyrighted software
+distributed under GNU GPL.
+
+This software used to be shareware. Marko Kohtala wants to thank all
+those who bought the license for the shareware versions. I hope this
+release as GNU GPL licensed open source software will provide you with
+the continuted support you deserve.
+
+This does not mean you may not donate. If you wish, you can do it via
+the SourceForge.net donation system.
+
+
+
+                          3. FEATURES INCLUDED
+
+This RAM disk currently supports the following features:
+
+  * Compatible with MS-DOS versions from 3 to 7 and DR-DOS 5 to 6.
+  * XMS - Extended memory on 286 and up with HIMEM or other XMS 2.0
+    driver.
+  * EMS - Expanded memory of LIM/EMS version 3.2 and 4.0.
+  * Device drivers may be chained to form larger disks using many
+    different kind memories.
+  * Resizeable - can preserve disk contents if new format has room 
+    enough.
+  * Removable. Can be disabled without reboot.
+  * Supports 32-bit sector addressing introduced in DOS 4. Thus over 32M
+    RAM disks are possible if you have the memory.
+  * Configurable
+      - sector size
+      - cluster size
+      - root directory entry count
+      - number of FATs
+  * Predefined DOS and FDFORMAT floppy disk look-alike formats.
+  * DISKCOPY compatible with DOS versions from 3.20 up. You can copy
+    to/from SRDISK drive using DOS DISKCOPY.
+  * Write protection.
+  * Can optionally set environment variables SRDISKn (n=1,2,...) to
+    the installed SRDISK drive letters.
+  * Comes with a dummy drive you can use to locate SRDISK (or any other 
+    installable) drive at a higher letter.
+
+I have a list of new features to implement in the future. By sending 
+money and feature suggestions you can help me make this program still 
+better.
+
+Users may find that the ability to resize is invaluable. Since some 
+programs can take best use of memory by directly using it while others 
+need a fast disk for temporary files, you can now have optimal 
+performance with both kinds of programs without the trouble of changing 
+configuration and rebooting.
+
+The feature of being able to resize automagically when there is need for 
+it is currently not in my reach. FAT file system in DOS just was not 
+designed for it. There is some more explanation about it later in this 
+document.
+
+
+
+                        4. FILES IN THIS RELEASE
+
+The following files are distributed in this release:
+
+        READ.ME         some notes
+        FILE_ID.DIZ     short description of packet for BBS operators
+        WHATSNEW.DOC    what is new in this release and history
+        SRDISK.DOC      this document
+        SRDXMS.SYS      device driver for XMS memory
+        SRDXMSS.SYS     device driver for XMS memory (small version)
+        SRDEMS.SYS      device driver for EMS 4.0 memory
+        SRDEMSS.SYS     device driver for EMS 4.0 memory (small version)
+        SRDEMS3.SYS     device driver for EMS 3.2 memory
+        SRDUMMY.SYS     device driver for nothing but use drive letters
+        SRDISK.EXE      formatter program
+        XMSSIZE.DOC     document for XMSSIZE.EXE
+        XMSSIZE.EXE     last resort tool for over 64M HIMEM.SYS trouble
+        SUOMI.DOC       Finnish version of this document
+
+The small versions of device drivers do not support DOS DISKCOPY 
+compatibility and may require user to make sure there is enough stack 
+available by specifying STACKS=8,512 (or similar) in CONFIG.SYS. Also, 
+you can not chain another device driver after a small version device 
+driver.
+
+
+
+                                5. USAGE
+
+The SRDISK is basically split into two parts:
+
+        1) a device driver to add the virtual drive into DOS and
+        2) a program to control the device driver
+
+The following explains the installation and how to use both of these
+parts.
+
+
+                        5.1. BASIC INSTALLATION
+
+The basic installation for XMS memory can be done following these steps:
+
+1. Copy SRDXMS.SYS into you root directory.
+
+2. Copy SRDISK.EXE into some directory in your PATH.
+
+3. Make sure you have HIMEM.SYS or some other XMS driver installed
+   in CONFIG.SYS before the following step.
+
+4. Add into your CONFIG.SYS line
+
+        DEVICE=SRDXMS.SYS
+
+5. Add into your AUTOEXEC.BAT after the PATH command line
+
+        SRDISK <size>
+
+The <size> defines the disk size in Kbytes.
+
+If you have EMS memory, then use file SRDEMS.SYS in place of SRDXMS.SYS 
+and make sure EMS 4.0 device driver is installed in CONFIG.SYS before 
+the SRDEMS.SYS.
+
+The device driver adds into DOS a new disk drive. Before you run
+SRDISK.EXE or when you set the disk size to zero, the new disk drive
+behaves as if you have a floppy drive without a floppy inserted.
+
+
+                       5.2. SRDISK DEVICE DRIVER
+
+For a RAM disk you need a device driver. This device driver supplies a 
+storage for an array of sectors which DOS uses to store all the data. 
+SRDISK comes with separate drivers for storing the sectors in XMS 
+(extended memory managed by HIMEM.SYS or other XMS driver) and in EMS 
+memory.
+
+Most often you do not need any parameters for the device drivers, but 
+the driver accepts two parameters:
+
+        DEVICE=SRDmmm.SYS [d:] [/A]
+
+The [] around the parameter mean it is optional; you must not type the
+brackets.
+
+d:      The 'd:' can be used to tell the driver at what letter it is 
+        assigned in case DOS does not let it know it.
+
+        Another use for 'd:' is to define into what SRDISK drive the 
+        current driver is to be appended.
+
+        If you need to have SRDISK at some specific drive letter, you 
+        can use SRDUMMY.SYS. Note though, that drive letters are always 
+        used in order from A to Z and you can only use up a few drives 
+        before the letter you want to use.
+
+/A      This tells the driver to append itself to the previously 
+        installed SRDISK device driver. The memory accessed using this 
+        driver is then available as extra memory to the previously 
+        installed SRDISK drive.
+
+        If you want the low part of your disk to use XMS and the high 
+        part EMS memory, you can put these two lines into your 
+        CONFIG.SYS
+
+                DEVICE=SRDXMS.SYS
+                DEVICE=SRDEMS.SYS /A
+
+        For this to work, the first device driver must have the extra 
+        code to look into the next driver for more memory. Therefore the 
+        first device driver must not be the small version SRDXMSS.SYS or 
+        SRDEMSS.SYS.
+
+Merely installing the driver gives you no RAM disk. It is as if you had 
+installed a floppy drive without putting a disk in the drive. For that 
+you need the SRDISK.EXE program.
+
+The following chapters give some explanation about the different memory 
+types and explains reasons for the problems there are.
+
+
+                    5.2.1. XMS MEMORY DEVICE DRIVER
+
+8088 processor instruction set can only access memory at addresses from 
+0 to 1048575 (1 megabyte) and memory above the address 1048575 is called 
+extended memory. i80286 had a new mode (protected mode) where the 
+instructions had a little different meanings and could be used to 
+address memory above the 1 megabyte limit.
+
+XMS (eXtended Memory Specification) is a means to control the usage of 
+extended memory between applications so that each application can have 
+exclusive access to some range of addresses without fear the other 
+application would be using the same memory for its own purposes.
+
+When SRDISK (or any other XMS client) needs extended memory, it requests 
+it from extended memory manager (EMM) that follows the eXtended Memory 
+Specification. Most common and free such memory manager is HIMEM.SYS.
+
+The EMM then tries to find available memory block (a contiguous range of 
+addresses available) that is as large or larger than the requested 
+memory block. If all of the available blocks are smaller than the 
+requested size, the request fails even if the available blocks would be 
+large enough when combined.
+
+Since DOS and DOS programs still run in the 8088 mode where instructions 
+can not address memory beyond 1 megabyte limit, there is no way for them 
+to access the memory directly. XMS also defines service to copy memory 
+to and from the memory beyond the 1 megabyte limit.
+
+
+                    5.2.2. EMS MEMORY DEVICE DRIVER
+
+Since 8088 could only address memory up to 1 megabyte, any memory added 
+had to be made to use the same addresses with already existing memory. 
+Some new hardware had to be added so that the memory occupying a range 
+of addresses could be switched with another block of memory. 
+Lotus/Intel/MicroSoft Expanded Memory Specification (LIM EMS) was 
+developed to provide standardized access to this memory for much the 
+same reason XMS was developed to provide access to extended memory.
+
+EMS uses a 64K memory area divided into four separate 16K windows to 
+access the expanded memory. These windows show different 16K blocks of 
+EMS memory (called pages) as requested by the application.
+
+EMS memory can also be simulated very efficiently with 386 virtual 
+memory. For example EMM386 uses this method to convert extended memory 
+into expanded memory.
+
+Since EMS memory is consisted of separate 16K pages, there is no 
+requirement to have the allocated memory be in contiguous blocks as with 
+XMS memory. Since all the available memory can be allocated, you can 
+better predict how much memory you can allocate.
+
+
+                    5.2.3. EMS 3.2 MEMORY DEVICE DRIVER
+
+EMS 3.2 is an older version of EMS. 4.0 is the currently most used one.
+
+The main reason SRDISK has version 3.2 driver is that MS-Windows 3.1 has 
+a serious bug in the EMS protection it uses. Basically with the EMS 3.2 
+driver you can access EMS disk that has been allocated before starting 
+MS-Windows but not one that is allocated inside DOS window. With the EMS 
+4.0 driver you can not access memory allocated before starting 
+MS-Windows but can well access memory that is allocated inside DOS 
+window.
+
+In any case, MS-Windows will not allow any other process access the 
+disk allocated in another process.
+
+
+                       5.3. SRDUMMY DEVICE DRIVER
+
+SRDUMMY.SYS can be used to force installable device drivers to some 
+specific drive letters. To better understand what for you might need it, 
+read the following paragraph.
+
+DOS allocates drives in order from A to Z. The first drives A and B are 
+always used for floppy drives. If you have hard disks, drives from C up 
+are allocated to them by DOS before CONFIG.SYS is loaded. After all the 
+standard hardware drives have been assigned, DOS reads the CONFIG.SYS 
+and loads the devices found there. Each block device driver (a device 
+supplying only an array of blocks of data, like SRDISK) is assigned one 
+or more drive letters in the order they are in CONFIG.SYS. The device 
+drivers can not determine to which drives they get assigned.
+
+SRDUMMY.SYS tells DOS it provides one or more block devices and thus 
+uses up some drive letters. There will not be any drives though, and if 
+you access the drives, you'll get the drive not ready error.
+
+SRDUMMY.SYS takes one parameter: The drive letter the next block device 
+should be loaded to.
+
+Take a look at the following sample CONFIG.SYS:
+
+        DEVICE=SRDXMS.SYS
+        DEVICE=SRDUMMY.SYS G:
+        DEVICE=SRDEMS.SYS
+
+If you have one hard disk, the floppies and hard disk use letters A-C. 
+SRDXMS.SYS is then loaded to D and SRDUMMY.SYS uses drives E and F.
+SRDEMS.SYS loads thus at G.
+
+If you add a second hard drive, it will take drive letter D and 
+SRDXMS.SYS will then be at E and SRDUMMY.SYS use only drive F putting
+SRDEMS.SYS to G again.
+
+If you add a few more drives so that drive G is already in use before 
+SRDUMMY.SYS gets loaded, you will only get a warning message from 
+SRDUMMY.SYS and the SRDEMS.SYS will load at the next available drive 
+letter.
+
+Unfortunately, this does not help if you have a CD-ROM installed and
+want to install SRDISK to a different drive letter. MSCDEX will not
+install to a drive letter already used by SRDUMMY no more than it
+installs to a drive used by SRDISK.
+
+DR-DOS 6 seems not to allow access to drive letters after P: even with 
+LASTDRIVE=Z statement in CONFIG.SYS. So with DR-DOS you must avoid using 
+the last drive letters after P:.
+
+
+                          5.4. SRDISK PROGRAM
+
+The disk can be enabled by, for example, using command "SRDISK 1024"
+which will make first SRDISK a 1024K disk. It can be disabled by making
+it of size 0: "SRDISK 0".
+
+You should include the command to enable the RAM disk into your
+AUTOEXEC.BAT file.
+
+The SRDISK.EXE is self documented. You'll get the documentation by
+typing at the DOS prompt "SRDISK /?" and hitting enter. To get a hang of
+it better, some examples with explanations are given below.
+
+
+                     5.4.1. SRDISK SAMPLE COMMANDS
+
+Command
+
+        SRDISK 1024
+
+creates or changes the old disk to a 1024K (= 1M) disk.
+
+More precisely it calculates various disk parameters as it best sees fit
+for most users needs. Those disk parameters can be defined by user on
+the command line if the calculated values do not meet his needs. After
+the parameters have been calculated, the memory (1024K = 1M) needed for
+the disk is allocated and a disk image is created into the memory.
+
+The calculated parameters include sector size, cluster size, number of
+FATs and root directory size.
+
+- Sector is the basic unit of storage. It's size does not mean much, but
+  it has to be a power of 2 and no larger than 512 bytes.
+
+- Cluster size tells in how large blocks the space is allocated. Larger
+  clusters mean smaller FAT (= File Allocation Table), but then even the
+  smallest file always takes at least that much space. Cluster can not
+  be smaller than one sector. A cluster is a collection of sectors.
+
+- FAT is the table that holds information about each allocation unit,
+  cluster, on the disk. The information can be indication that the
+  cluster is free, or where the next cluster of the file is or that the
+  cluster is unusable. A disk only needs one FAT - though multiple
+  copies of it can be specified. Note that the other FATs are only
+  copies of the first one.
+
+- Root directory is limited to hold only some predefined number of
+  files. If you get "Can not create file" errors while there is plenty
+  of free space on disk, you need to make the root directory larger.
+  Alternatively you should create a subdirectory and create the files
+  there. Subdirectories can be arbitrarily large.
+
+If there is data on the disk to be preserved, sector and cluster size 
+are not changed.
+
+Command
+
+        SRDISK 1024 /O
+
+does the same as the command 'SRDISK 1024' except the various disk
+parameters are not calculated but instead the old parameters are used.
+
+Command
+
+        SRDISK /F:1440
+
+tries to create the disk to look like a real floppy disk. It also 
+defines some parameters that otherwise have no effect like media 
+descriptor, number of heads and sectors per track. These parameters have 
+no other function but to make it look like it is a real, physical disk - 
+which it is not. SRDISK drives are not accessible through BIOS, so some 
+diskcopy and utility programs can fail if used with SRDISK.
+
+Command
+
+        SRDISK /S:256 /C:1024 /D:64
+
+reformats the disk. The size is determined by the old size of the disk
+even without the use of /O. Sector size is changed to 256 bytes, cluster
+size to 1024 bytes (two sectors) and root directory will hold 64 entries
+(one of which is used for the volume label).
+
+Command
+
+        SRDISK /U
+
+clears the disk. It recalculates the format and makes it better if 
+possible, but preserves the disk size. Without this switch, the disk 
+contents are preserved if possible. This is also useful if you can not 
+resize the disk because of errors on it -- using this option the errors 
+will be ignored and the disk is made whole new.
+
+Command
+
+        SRDISK E:
+
+tests if E is a SRDISK RAMDisk and, as no format is defined, display
+it's current configuration. The letter may not correspond to the letter
+known by DOS for the drive if the letter is defined wrong when
+installing the SRDISK.SYS device driver in CONFIG.SYS.
+
+Command
+
+        SRDISK
+
+without the drive letter specified tries to determine the drive by first
+trying the current drive and if it is not a SRDISK drive, then the first
+SRDISK drive loaded in CONFIG.SYS. As no change in the format is
+defined, the current configuration of the found drive are displayed.
+
+
+                   5.4.2. SRDISK COMMAND LINE OPTIONS
+
+To ease remembering the command line options, SRDISK has for some 
+settings several different options. Many of the options are long, but 
+you can truncate them if you write enough for SRDISK to identify the 
+option unambiguously.
+
+An exact match in the full length of the option is always identified 
+instead of some another option that begins with the same characters.
+
+All numeric parameters for the options are translated using the C 
+language rules: Number starting with 0 is octal number (base eight) and 
+with 0x is hexadecimal (base 16), others are decimal.
+
+The options in alphabetical order are
+
+  /?               List of most important command line options
+  /A:n             Number of FAT copies (1 or 2)
+  /ASK             Ask for confirmation if data would be lost
+  /AVAILABLE:n     Resize to disk to have n Kbytes of space available
+  /BOOTSECTOR:file Boot sector image file
+  /C:n             Cluster size
+  /CLUSTER:n       Same as /C
+  /D:n             Dir entries
+  /DEVICETYPE:n    Device type for DISKCOPY compatibility
+  /DIRENTRIES:n    Same as /D
+  /DOSFORMAT:n     DOS or FDFORMAT look-alike format
+  /E               Set environment variables SRDISKn
+  /ENVIRONMENT     Same as /E
+  /ERASE           Clear disk contents, implies /FORCE
+  /F:n             Same as /DOSFORMAT
+  /FATS:n          Same as /A
+  /FILESPACE:n     Make the disk have n Kbytes space for files
+  /FORCE           Destroy data if necessary to force new format
+  /FREEMEM:n       Determine disk size to leave at least n Kbytes mem free
+  /H               Same as /?
+  /HEADS:n         Number of heads for DISKCOPY compatibility
+  /HELP            Same as /?
+  /M:n[:n...]      Max sizes for different drivers chained to a drive
+  /MAXSIZE         Allocate the disk as large as it can safely be allocated
+  /MEDIA:n         Media ID byte for DISKCOPY compatibility
+  /MINSIZE         Alias to /AVAILABLE:0, minimize the disk
+  /NO              NO, do not destroy data to complete new format
+  /O               Use old disk format where not redefined
+  /OLD             Same as /O
+  /REMOVABLE:x     Tell DOS the drive is removable if x is ON.
+  /S:n             Sector size (128, 256 or 512 bytes)
+  /SECTORS:n       Number of sectors per track
+  /SECTORSIZE:n    Same as /S
+  /SIDES:n         Same as /HEADS
+  /SPT:n           Same as /SECTORS
+  /U               Same as /ERASE, FORMAT compatible
+  /UNCONDITIONAL   Same as /ERASE /FORCE
+  /V:n             Verbose level (1-5) to control amount of output
+  /VERBOSE:n       Same as /V
+  /W:x             Write protection x is ON/+ or OFF/-
+  /WRITEPROTECT:x  Same as /W
+  /Y               Same as /FORCE
+  /YES             Same as /FORCE
+
+The options by function
+
+  /? /H /HELP
+
+        List the most important command line options and exit.
+
+  /A:n /FATS:n
+
+        Number of FAT copies (1 or 2). You need only one FAT unless you 
+        need to make the disk look like some floppy disk.
+
+  /AVAILABLE:n /MINSIZE
+
+        Space available on the disk. The disk size will be counted to be 
+        large enough to hold the files already on it and to have n 
+        Kbytes of space available.
+
+        /MINSIZE is the same as /AVAILABLE:0 and will also make the root 
+        directory smaller.
+
+  /BOOTSECTOR:file
+
+        You might be interested in a special boot sector if you are
+        preparing a disk to be copied to a real floppy. SRDISK provides
+        a working boot sector, so this is not necessary but in a very
+        special situation.
+
+  /C:n /CLUSTER:n
+
+        Cluster size. Cluster is the unit used to allocate disk space.
+        This option has effect on the space used for File Allocation 
+        Table. If cluster size is small, bigger FAT is needed and there 
+        is less room for files, but files may take more room.
+
+  /D:n /DIRENTRIES:n
+
+        Root directory entries. FAT file system has fixed size root 
+        directory. You can specify the size for it using this option.
+
+        Note that each entry is 32 bytes long and a fixed amount of 
+        sectors are used to hold the entries. Thus if sector size is 512 
+        bytes each sector can hold 16 entries (512 / 32 = 16) and 
+        specifying /D:4 or /D:16 uses exactly the same amount of space 
+        on the disk: one sector.
+
+        If there is nothing against it, I start to round the number of 
+        root directory entries up to fill the last root directory 
+        sector. Some utility programs can be confused if the last sector 
+        is only partially used.
+
+  /DEVICETYPE:n
+
+        DOS does not care what type the device is, but in case some 
+        utility program asks DOS for the type it can be specified with 
+        this switch. This is normally set correctly if you use the /F 
+        switch. Device types are
+
+                0 = 360K
+                1 = 1.2M
+                2 = 720K
+                3 = 8-inch single-density
+                4 = 8-inch double-density
+                5 = Hard disk
+                6 = Tape drive
+                7 = 1.44M
+                8 = Read/Write optical
+                9 = 2.88M
+
+  /E /ENVIRONMENT
+
+        Set environment variables SRDISK1, SRDISK2 etc. to the drive 
+        letters or SRDISK drives installed. You can then use the 
+        variables in batch files to access the RAM disk.
+
+        For example:
+
+                REM Set environment variables without much output and
+                REM make a tiny disk at the same time
+                SRDISK /E /V:1 /F:1
+                SET TMP=%SRDISK1%:\TMP
+                MKDIR %TMP%
+
+                IF "%SRDISK2%" == "" ECHO You have only one SRDISK drive
+
+  /F:n /DOSFORMAT:n
+
+        DOS or FDFORMAT look-alike formats. The number n defines the disk 
+        size in Kbytes. This option also sets all the other parameters 
+        besides the size to match the corresponding DOS or FDFORMAT 
+        created floppy disk.
+
+        The currently supported formats are
+
+          Size Media Device SPT Head Root
+
+           160  FE     360   8   1    64    DOS
+           180  FC     360   9   1    64    DOS
+           200  FD     360  10   1   112    FDFORMAT
+           205  FD     360  10   1   112    FDFORMAT
+           320  FF     360   8   2   112    DOS
+           360  FD     360   9   2   112    DOS
+           400  FD     360  10   2   112    FDFORMAT
+           410  FD     360  10   2   112    FDFORMAT
+           640  FB     720   8   2   112    DOS
+           720  F9     720   9   2   112    DOS
+           800  F9     720  10   2   112    FDFORMAT
+           820  F9     720  10   2   112    FDFORMAT
+          1200  F9     1.2  15   2   224    DOS
+          1440  F0    1.44  18   2   224    DOS
+          1476  F0    1.44  18   2   224    FDFORMAT
+          1600  F0    1.44  20   2   224    FDFORMAT
+          1640  F0    1.44  20   2   224    FDFORMAT
+          1680  F0    1.44  21   2   224    FDFORMAT
+          1722  F0    1.44  21   2   224    FDFORMAT
+          2880  F0    2.88  24   2   240    DOS
+
+        In addition to these there is a special format 1 to make a mini 
+        disk. This can be used if you have your RAM disk in your PATH 
+        and do not want to get Drive Not Ready errors when you have 
+        freed the memory for RAM disk. Check your memory manager though: 
+        some memory managers allocate memory in 16K chunks and a 1K disk 
+        uses as much memory as a 16K disk does.
+
+  /FILESPACE:n
+
+        Space available for files. The disk will be larger than n 
+        Kbytes, since file allocation table and root directory always 
+        take some space too.
+
+        Note that files usually take some extra space because the space 
+        for them is allocated in clusters. For example, if cluster size 
+        is 1024 bytes (1K), any file this long or smaller (but not 0 
+        bytes) will use one cluster and thus 1024 bytes.
+
+        Subdirectories also use file space.
+
+  /FREEMEM:n /MAXSIZE
+
+        Memory available for other programs. The disk will be sized to 
+        leave at least n Kbytes of memory to other programs. The disk 
+        size may be less than necessary if there is some uncertainty 
+        whether or not all the memory can be allocated.
+
+        FOR XMS MEMORY, THIS CAN ALLOCATE LESS THAN THERE IS AVAILABLE 
+        SINCE XMS CAN NOT RELIABLY PUT ALL FREE MEMORY IN ONE BLOCK. 
+        ALSO, SINCE SOME MEMORY MANAGERS ALLOCATE MEMORY IN BLOCKS OF 4 
+        OR 16 KBYTES, THERE MIGHT BE 15 KBYTES LESS FREE MEMORY THAN 
+        REQUESTED.
+
+        The disk can also be disabled if more free memory is requested 
+        than there is available.
+
+        /MAXSIZE is same as /FREEMEM:0, thus using all safely available 
+        memory for the disk.
+
+        If some program of yours needs free memory and you do not care 
+        for disk contents, you can put for example
+
+                SRDISK /FREEMEM:1024 /YES
+
+        into a batch file to start to program. The /YES gives permission 
+        to clear the disk if the disk can not be made small enough 
+        otherwise.
+
+  /HEADS:n /SIDES:n
+
+        Number of heads for DISKCOPY compatibility. This is normally set 
+        correctly if you use the /F switch.
+
+  /M:n[:n...]
+
+        Max sizes for different drivers chained to a drive.
+
+        Normally SRDISK uses as much space as is available on the first 
+        driver and only then starts allocating on the second one. If you 
+        want to use only up to some amount of memory on the different 
+        drivers chained to one drive, you can define the amounts with 
+        this option.
+
+        For example to define first driver use only 100K of memory, give 
+        command
+
+                SRDISK /M:100
+
+        If you would have three or more drivers chained into one drive, 
+        you could define first and third to use 100K and let the other 
+        drivers use as much as they were allowed to use before with 
+        command
+
+                SRDISK /M:100::100
+
+  /MEDIA:n
+
+        Media ID byte for DISKCOPY compatibility. This is normally set 
+        correctly if you use the /F switch.
+
+        Use Media IDs in the range from 0xF0 to 0xFF. Smaller values 
+        make CHKDSK report that it is possibly non-DOS format media.
+
+  /O /OLD
+
+        Use old disk format where not explicitly redefined with command
+        line options.
+
+  /REMOVABLE:x
+
+        This is for advanced users only. If you do not know all the 
+        possible effects of this switch, you better leave it alone.
+
+        This is provided to allow fooling programs which misbehave when 
+        they see a removable RAM disk. If the x is ON, + or nothing, the 
+        device driver reports the disk correctly as removable. If the x 
+        is OFF or -, the device driver reports the disk not removable in 
+        the same way RAMDRIVE does. It also prohibits SRDISK.EXE from 
+        reformatting the disk.
+
+  /S:n /SECTORSIZE:n
+
+        Sector size (128, 256 or 512 bytes). Sector is the basic 
+        allocation unit of a disk. Smaller sector size can decrease the 
+        amount of memory wasted on boot sector, FAT and root directory, 
+        but that is just about the only benefit of it. Clusters are 
+        formed of sectors, so sector size can not be larger than cluster 
+        size. DOS uses by default 512 bytes per sectors.
+
+  /SECTORS:n /SPT:n
+
+        Number of sectors per track for DISKCOPY compatibility. This is 
+        normally set correctly if you use the /F switch.
+
+  /U /UNCONDITIONAL /ERASE
+
+        Clear disk contents. This implies option /YES.
+
+        If your disk gets corrupted and SRDISK refuses to reformat it, 
+        try this switch. SRDISK should not then care about the current 
+        disk, but rather just wipes it off and creates a new one.
+
+  /V:n /VERBOSE:n
+
+        Verbose level (1-5) to control amount of output. With /V:1 you 
+        can limit the output to the title.
+
+  /W:x /WRITEPROTECT:x
+
+        Write protection control. The parameter x can be ON, + or nothing 
+        to enable the write protection or OFF or - to disable it.
+
+  /Y /YES /FORCE
+  /NO
+  /ASK
+
+        These are to control the need of user intervention.
+
+        All questions in SRDISK are formed so that answer YES will give 
+        permission to destroy data and continue, while NO will abort the 
+        operation and try to preserve the data on the disk. By these 
+        options you can give the answer on the command line.
+
+        /ASK is the default and means the user will be prompted to make 
+        choice.
+
+
+
+                           6. TROUBLESHOOTING
+
+Causes of grief
+
+1. RAM disks loose their contents when power is turned off! Do not store
+anything valuable there.
+
+2. There is no XMS nor EMS memory without a proper device driver. 
+HIMEM.SYS will do for XMS. For EMS you need to install the device driver 
+that came with your expanded memory hardware. QEMM can supply both on 
+386 or better hardware and you might be better off using the SRDEMS 
+driver with it.
+
+3. Not all HIMEM.SYS support memory above 16M limit. HIMEM.SYS versions 
+2.78 and later should be good. Also these later versions may be limited
+to 128000K blocks; solution is to link two (or more) SRDXMS.SYS drivers
+(i.e. add "DEVICE=SRDXMS.SYS /A" line to CONFIG.SYS) and limit the first
+one with command "SRDISK /M:128000". This will only break the /MAXSIZE
+option.
+
+4. Not all HIMEM.SYS support memory above 64M limit. You can try
+XMSSIZE.EXE as a last resort solution after trying to find a working XMS
+driver.
+
+5. DR-DOS 5 HIDOS.SYS does not implement the XMS resize function.
+Therefore SRDISK may not be able to resize the disk unless you replace 
+the HIDOS.SYS with HIMEM.SYS.
+
+6. Some programs swap themselves for a shell to the RAMDisk. If you
+change the format of the disk or clear the disk from such program, the
+swapped program may not be able to recover and can crash your computer.
+
+7. Some disk caching programs are reported to cache SRDISK too! This can
+cause a system crash and caching a RAM disk is anyway useless. If you 
+use a disk cache, please load it before SRDxxx.SYS or tell it explicitly 
+not to cache the SRDISK drive.
+
+8. SRDISK needs it's XMS memory in one contiguous area. Therefore if
+SRDISK complaints about insufficient memory while you have plenty of it 
+free, the reason might be that some other program uses a piece of the
+memory in the middle of the available memory. If you have a choice, use 
+EMS since it does not (usually) have this problem.
+
+9. There can be problems with XMS memory when not enough of it can be
+allocated. This may result in lost disk contents. Also some memory 
+managers that provide both XMS and EMS (like QEMM and the EMM386.EXE of 
+MS-DOS 6) can fool SRDISK to think there is more memory available than 
+there really is if SRDISK uses both XMS and EMS memory for the disk.
+
+10. Some multitasking environments (like MS-Windows) can free the memory
+allocated under them to the RAM disk. This will cause the data to be lost
+and errors in programs that try to access the disk.
+
+11. MS-Windows 3.x has buggy memory protection that prevents programs
+from accessing memory allocated in another session. It also prevents
+using EMS memory allocated for the SRDEMS.SYS driver outside Windows and
+for the SRDEMS3.SYS driver inside Windows. In general you may find it
+better to use SRDEMS3.SYS or SRDXMS.SYS and allocate any disk you will
+use before starting Windows and never resize any disk while inside
+Windows.  
+
+12. Some programs try to access the disk directly thinking that it is
+a floppy drive. Such attempts naturally fail. McAfee SCAN is one such
+program, but you can disable the direct disk access with /NODDA option
+to SCAN.
+
+
+
+                7. FREQUENTLY ASKED QUESTIONS AND ANSWERS
+
+Q: Why can not SRDISK resize automatically as files are written to the
+   disk? Or why can not SRDISK allocate memory only as much as needed for
+   the files?
+A: SRDISK device driver is very stupid. It only reads and writes sectors,
+   that is, blocks of data, as requested by DOS. The device driver does
+   not know anything about files and directories. SRDISK with this
+   functionality would not be SRDISK anymore. It would be much larger,
+   somewhat slower and less reliable in some circumstances.
+
+Q: Can you write a program that saves the disk contents on shutdown or
+   periodically and restores it on startup?
+A: Yes, but I find it unnecessary. I think disk caches can come close to
+   what you are after. Also, there already is such a program, called
+   ramsave, which works with all RAM disks. I only know how to find it
+   on Internet: go to http://www.shareware.com/ and search for it.
+
+Q: I have a CD-ROM/NET at drive D:, but now SRDISK wants to use D:. What
+   now?
+A: SRDISK is a block device driver and DOS, not SRDISK, selects the
+   drive letter for the drive. CD-ROM is a file system and DOS allows it
+   to choose it's own drive letter. You'd have this same problem with
+   second hard disk or other block device. In my opinion, it is best to
+   install CD-ROM at drive letter Z: so you do not run into this problem
+   again. If you are fearless explorer, you can seek for some device
+   driver loader. They go into DOS internals to set the drive letter
+   while they install the device driver. They also tend to be unreliable
+   and work with only few DOS versions.
+
+Q: Why does Windows 95 slow down when I have SRDISK installed?
+A: It does not recognize SRDISK and uses safer and slower disk access
+   methods. To fix it, find file named IOS.INI in your Windows
+   directory. Add in this file these lines (much the same way as there
+   already is a line for ramdrive.sys)
+     srdxms.sys, NON_DISK  ; MS-DOS  
+     srdems.sys, NON_DISK  ; MS-DOS  
+     srdxmss.sys, NON_DISK  ; MS-DOS 
+     srdemss.sys, NON_DISK  ; MS-DOS 
+
+Q: What is the latest version of SRDISK?
+A: SRDISK has become quite stable. There are no new versions very often.
+   However, check the answer to the next question below or email me.
+   I'll be glad to tell you. My address is at the end of this document.
+
+Q: Where can I find latest version of SRDISK?
+A: The release site is at http://sourceforge.net/projects/srdisk.
+
+Q: SRDISK does not work! What is the problem?
+A: Give me more information. I need to know exactly what you have done
+   and what results you get. Tell me your DOS manufacturer (MS, IBM,
+   DR...), DOS version, hardware description with CPU type, amount of
+   memory, memory manager software versions. Include CONFIG.SYS,
+   AUTOEXEC.BAT, detailed chronological description of what you see on
+   screen, what you type etc. The best is if I can get the problem
+   appear on my PC.
+
+Q:
+A: I am kind of pleased this silence is so common. However, I live on
+   feedback. Feed me. Do not keep silent.
+
+
+
+                             8. TRADEMARKS
+
+Oh, and we should not forget these (I can not verify they are correct, 
+but still):
+
+QEMM is a trademark of Quartedreck Office Systems Inc.
+Microsoft, MS-DOS, SmartDrive and Windows are trademarks of Microsoft 
+Corporation. DR-DOS is a trademark of Novell. Intel is a trademark of 
+Intel Corporation. Lotus is trademark of Lotus Development Corporation.
+
+FDFORMAT is copyrighted by (and trademark of?) Christoph H. Hochst„tter,
+Germany. Nice work.
+
+SRDISK is my trademark.
+
+If any mentioned trademarks are not included in this list, please tell 
+me about them. They are anyway hereby acknowledged.
+
+
+
+                             9. LAST WORDS
+
+Please, if you know of a way to get around the Windows 3.1 memory 
+protection, let me know about it.
+
+You can contact me by sending email to kohtala@users.sourceforge.net.

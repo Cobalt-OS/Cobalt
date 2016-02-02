@@ -1,0 +1,1458 @@
+;
+;****************************************************************************
+;
+; SHSUFDRV Version 1.00
+; Jason Hood, December 2004 & June 2005.
+; jadoxa@yahoo.com.au
+; http://shsufdrv.adoxa.cjb.net/
+;
+; v1.01, October 2005.
+; v1.02, December 2005.
+;
+; A driver for floppy and hard disk images.
+;
+; Acknowledgements to:
+;   * Ralf Brown's Interrupt List;
+;   * Jim Kyle for DEVLOD.C;
+;   * John H. McCoy for SHSUCDX/SHSUCDHD and an initial version of this.
+;
+; Todo:
+;   * recognise other hard disk partitions;
+;   * check for partial images that don't have unused sectors;
+;   * get write working.
+;
+;****************************************************************************
+;
+
+;%define i8086		; If defined no 386 instructions will be used.
+%define RW		; If defined images are writable.
+;%define STGY		; If not defined intr assumes ES:BX has request header.
+
+;%define FORMAT 	; If defined drives can be formatted and VSN set.
+; Notes: MS-DOS FORMAT prompts for disk (uses disk type, not removable flag);
+;	   the VSN is not written to disk;
+;	 FreeDOS FORMAT updates the VSN directly, so GetVSN still returns old.
+
+%ifdef FORMAT
+ %ifndef RW
+  %undef FORMAT
+ %endif
+%endif
+
+
+%include "nasm.mac"
+
+%ifdef i8086
+	cpu	8086
+%else
+	cpu	386
+%endif
+
+struc rh
+  .Length		resb	1	; header size in bytes
+  .Unit 		resb	1	; drive unit mumber
+  .Command		resb	1	; device command code
+  .Status		resw	1	; device command status
+  .Reserved		resb	8
+endstruc
+
+struc rhIOCTL
+			resb	rh_size ; RH common
+  .Category		resb	1
+  .Command		resb	1
+  .stuff		resw	2
+  .ParBlock		resd	1	; pointer to IOCTL parameter block
+endstruc
+
+struc rhMediaCk
+			resb	rh_size ; RH common
+  .MediaDesc		resb	1
+  .MediaStatus		resw	1
+  .VolNamePtr		resd	1
+endstruc
+
+struc rhBuildBPB
+			resb	rh_size ; RH common
+  .MediaDesc		resb	1
+  .FATPtr		resd	1
+  .BPBPtr		resd	1
+endstruc
+
+struc rhRead
+			resb	rh_size ; RH common
+  .MediaDesc		resb	1
+  .XfrAddr		resd	1
+  .SectorCount		resw	1
+  .StartSector		resw	1	; if 0FFFFh use StartSector32
+  .VolID		resd	1
+  .StartSector32	resd	1
+endstruc
+
+rhcmdMediaCheck 	equ	01h
+rhcmdBuildBPB		equ	02h
+rhcmdRead		equ	04h
+rhcmdWrite		equ	08h
+rhcmdWriteVerify	equ	09h
+rhcmdIOCTL		equ	13h
+rhcmdIOCTLCheck 	equ	19h
+
+iocmdSetParm		equ	40h	; set device parameters
+iocmdFormat		equ	42h
+iocmdSetVSN		equ	46h	; set volume serial number
+iocmdGetParm		equ	60h
+iocmdVerifyTrack	equ	62h
+iocmdGetVSN		equ	66h
+iocmdGetAccess		equ	67h
+
+MediaChanged_No 	equ	 1
+MediaChanged_Yes	equ	-1
+MediaChanged_DontKnow	equ	 0
+
+DeviceError		equ	8000h
+DeviceDone		equ	0100h
+DE_UnknownUnit		equ	  01h	; OR these with DeviceError
+DE_DeviceNotReady	equ	  02h
+DE_UnknownCommand	equ	  03h
+DE_SectorNotFound	equ	  08h
+DE_WriteError		equ	  0Ah
+DE_ReadError		equ	  0Bh
+DE_GeneralFailure	equ	  0Ch
+
+; Current Directory Structure
+struc CDS
+  .CurrPath		resb	67
+  .Flags		resw	 1
+  .DPB			resd	 1
+  .CurDir		resw	 1
+  .FFFF 		resd	 1
+  .RootOff		resw	 1
+  .Type 		resb	 1
+  .IFSRedir		resd	 1
+  .Avail		resw	 1
+endstruc
+
+; BIOS Parameter Block
+struc BPB
+  .BytesPerSector	resw	1
+  .ClusterSize		resb	1
+  .NumReservedSectors	resw	1
+  .NumCopiesOfFat	resb	1
+  .MaxNumRootDirEntries resw	1
+  .TotalNumSectors	resw	1	; if zero use BigTotalNumSectors
+  .MediaDesc		resb	1
+  .NumSectorsPerFat	resw	1
+  .NumSectorsPerTrack	resw	1
+  .NumHeads		resw	1
+  .NumHiddenSectors	resd	1
+  .BigTotalNumSectors	resd	1
+  ;.Unknown		resb	6	; this is what RBIL says is in the BPB
+  ;.NumCylinders	resw	1
+  ;.DeviceType		resb	1
+  ;.DeviceAttr		resw	1
+  .DeviceType		resw	1	; this is what's on the drive
+  .ExtBootSig		resb	1
+  .VSN			resd	1
+  .VolLabel		resb	11
+  .FSType		resb	8
+endstruc
+
+; Drive Parameter Block
+struc DPB
+  .DriveNumber		resb	1
+  .UnitNumber		resb	1
+  .BytesPerSector	resw	1
+  .HighestSector	resb	1	; sectors per cluster - 1
+  .SectorShift		resb	1
+  .ReservedSectors	resw	1
+  .NumFats		resb	1
+  .RootEntries		resw	1
+  .UserSector		resw	1
+  .HighestCluster	resw	1
+  .SectorsPerFAT	resw	1
+  .RootSector		resw	1
+  .Device		resd	1
+  .MediaID		resb	1
+  .Accessed		resb	1
+  .NextDPB		resd	1
+  .StartCluster 	resw	1	; start search for free cluster
+  .FreeClusters 	resw	1
+endstruc
+
+SectorSize		equ	512	; make it an EQU so we don't change it
+SectorShift		equ	9
+
+
+struc DriveEntry
+  .BPB			resb	BPB_size	; expected first
+  .DPB			resb	DPB_size
+  .Handle		resw	1
+  .Offset		resd	1	; 0 for floppy, partition offset for HD
+endstruc
+
+
+; DOS device header
+; DO NOT MAKE THE DEVICE DRIVER NAME THE SAME AS THE FILE NAME
+
+FDRVHdr
+  NextDriver	dd	-1
+  Attributes	dw	08c2h		; generic IOCtl, 32-bit sectors
+		dw	Strategy
+		dw	Interrupt
+  Units 	db	0		; number of drives on this device
+  DeviceName	db	'SHSU-FD'
+
+
+rhAddr		dd	0
+SDAp		dd	0
+SSSP		dd	0
+
+		times 32 dd 'Stak'
+stacktop
+
+
+; Use BP to access variables, since it's shorter than direct memory access
+; (one byte for displacement, instead of two bytes for address).
+%define BP_(var) bp+var-FDRVHdr
+
+; Error routine can be in two locations, depending on FORMAT.
+%macro rhError 0
+.err:	mov	al, DE_UnknownCommand
+	db	0b9h			; MOV CX, nnnn
+.unk:	mov	al, DE_UnknownUnit
+	jmp	.erxit
+%endmacro
+
+
+;+
+; FUNCTION : ReadImage
+;
+;	Read (or write) the sectors from (to) the file.
+;
+; Parameters:
+;	CS:SI -> drive entry
+;	CX:DX := file offset
+;	[BytesToRead] := number of bytes to read/write
+;
+; Returns:
+;	AL := 0 for all bytes read
+;	      device error code otherwise
+;
+; Destroys:
+;
+;-
+ReadImage
+	mov	bx, [cs:si+DriveEntry.Handle]	; replaced with CALL if DR-DOS
+
+	; get InDOS flag
+	lds	si, [BP_(SDAp)]
+	cmp	[si+1], dl		; DL = 0 from low byte of file offset
+	pushf
+	if nz
+	 ; save the SDA
+	 save	cx
+	  ld	es, cs
+	  mov	di, i(SDASave)
+SDASave1 iw
+	  call	.cpsda
+	 restore
+	fi
+
+	dos	4200h			; set file pointer position
+	; read sector(s)
+	mov	cx, i(BytesToRead)
+BytesToRead iw
+	lds	si, [BP_(rhAddr)]
+	lds	dx, [si+rhRead.XfrAddr]
+	mov	ah, 3fh
+RWfn ib
+	dos
+	mov	al, DE_ReadError
+fault ib
+	if. nc, zero ax
+
+	popf
+	if nz
+	 ; restore the SDA
+	 les	di, [BP_(SDAp)]
+	 ld	ds, cs
+	 mov	si, i(SDASave)
+SDASave2 iw
+.cpsda:  mov	cx, i(SDASize)
+SDASize iw
+	 rep	movsw
+	fi
+	ret
+
+
+%ifdef STGY
+;************************************************************************
+;* Driver Strategy routine
+;************************************************************************
+
+Strategy
+	; ES:BX contains request header pointer, save it.
+	ses	bx, cs:rhAddr
+	retf
+%endif
+
+
+;************************************************************************
+;* Driver Interrupt routine
+;************************************************************************
+
+Interrupt
+	pushf
+	savea	ds,es
+%ifdef i8086
+	save	bp
+%else
+	save	eax
+%endif
+	cld
+
+	sss	sp, cs:SSSP
+	ld	ss, cs
+	mov	sp, stacktop
+	zero	bp ; = FDRVHdr
+
+%ifdef STGY
+	lds	bx, [BP_(rhAddr)]	; make sure we have RH addr
+%else
+	ld	ds, es			; assume ES:BX still has it
+	sds	bx, BP_(rhAddr)
+%endif
+	mov	al, [bx+rh.Unit]
+	cmp	al, i(iUnits)
+iUnits ib
+	jae	.unk
+
+%ifdef i8086
+	mov	cl, DriveEntry_size
+	mul	cl
+	mov	si, Drive
+	add	si, ax
+%else
+	cbw
+	imul	si, ax, DriveEntry_size
+	add	si, Drive
+%endif
+
+	mov	al, [bx+rh.Command]
+
+	if al ,e, rhcmdIOCTL
+	 les	di, [bx+rhIOCTL.ParBlock]
+%ifdef FORMAT
+	 mov	al, [bx+rhIOCTL.Command]
+	 push	ds
+	 ld	ds, cs
+	 if al ,e, iocmdGetVSN
+%else
+	 ifb [bx+rhIOCTL.Command] ,e, iocmdGetVSN
+	  push	ds
+	   ld	ds, cs
+%endif
+	   add	si, BPB.VSN
+	   scasw			; skip info
+.dnmv23:   mov	cx, 23
+.dnmv:	   rep	movsb
+.dnds:	  pop	ds
+	  jmp	.dn
+	 fi
+%ifndef FORMAT
+	 rhError
+	fi
+%else
+	 if al ,e, iocmdSetVSN
+	  swap	ds, es
+	  add	si, BPB.VSN
+	  scasw 			; skip info
+	  xchg	si, di
+	  jmp	.dnmv23
+	 fi
+
+	 jif	al ,e, iocmdGetParm, .gp
+
+	 pop	ds
+	 sub	al, iocmdFormat
+	 if ne
+	  sub	al, iocmdVerifyTrack - iocmdFormat
+	  if ne
+	   jif	al ,ne, iocmdGetAccess - iocmdVerifyTrack, .err
+	   inc	di
+	  fi
+	 fi
+	 stosb				; supported by BIOS / access allowed
+	 jmp	.dn
+	fi
+
+	if al ,e, rhcmdIOCTLCheck
+	 jifb	[bx+rhIOCTL.Command] ,e, iocmdSetVSN, .dn
+
+	 rhError
+
+.gp:	 mov	ax, hl(7,5)		; other type, use current BPB,
+	 stosw				;	      same size sectors
+	 mov	ax, 1			; nonremovable media
+	 stosw
+	 stosw				; 1 cylinder seems fine
+	 dec	ax			; media type other
+	 stosb
+	 mov	cx, BPB.DeviceType
+	 jmp	.dnmv
+	fi
+%endif
+
+	; Scandisk will test the FAT media byte if the disk is not removable,
+	; so say we are to avoid modifying that byte (from F0 to F8).
+	;if al ,e, 0fh ;rhcmdRemovable
+	; mov	ah, 2			; busy = not removable
+	; jmp	.ddone
+	;fi
+
+	if al ,e, rhcmdMediaCheck
+	 mov	[bx+rhMediaCk.MediaStatus], al ;MediaChanged_No
+	 jmp	.ddone
+	fi
+
+	if al ,e, rhcmdBuildBPB
+	 scs	si, bx+rhBuildBPB.BPBPtr
+.dn:	 jmp	.ddone
+	fi
+
+%ifdef RW
+	movb	[BP_(RWfn)],  3fh
+	movb	[BP_(fault)], DE_ReadError
+	if al ,ne, rhcmdRead
+	 sub	al, rhcmdWrite
+	 cmp	al, 1 ;rhcmdWriteVerify
+	 ja	.err
+	 incb	[BP_(RWfn)]  ;40h
+	 decb	[BP_(fault)] ;DE_WriteError
+	fi
+%else
+	jif	al ,ne, rhcmdRead, .err
+%endif
+	; Limit read/write to 63.5Ki.
+	mov	ax, [bx+rhRead.SectorCount]
+	if ax ,a, 127
+	 mov	ax, 127
+	 mov	[bx+rhRead.SectorCount], ax
+	fi
+%ifdef i8086
+	mov	cl, SectorShift
+	shl	ax, cl
+%else
+	shl	ax, SectorShift
+%endif
+	jz	.ddone
+	mov	[BP_(BytesToRead)], ax
+	; calc file pointer position
+	save	ds,bx
+%ifdef i8086
+	 ldhl	cx,dx, bx+rhRead.StartSector32
+	 shl	dx, 1
+	 rcl	cx, 1
+	 mov	ch, cl
+	 mov	cl, dh
+	 mov	dh, dl
+	 mov	dl, 0
+	 add	dx, [cs:si+DriveEntry.Offset]
+	 adc	cx, 0 ;[cs:si+DriveEntry.Offset+2]
+%else
+	 mov	eax, [bx+rhRead.StartSector32]
+	 shl	eax, SectorShift
+	 add	eax, [cs:si+DriveEntry.Offset]
+	 ldw	cx,dx, eax
+%endif
+	 dos	62h
+	 save	bx
+	  mov	bx, i(PSP)
+PSP iw
+	  dos	50h
+	  call	ReadImage
+	 restore
+	 save	ax
+	  dos	50h
+	 restore
+	restore
+	ifnz ax
+	 zerow	[bx+rhRead.SectorCount]
+.erxit:  mov	ah, DeviceError >> 8
+	fi
+
+.ddone: or	ax, DeviceDone
+	mov	[bx+rh.Status], ax
+
+%ifdef i8086
+	mov	ss, [BP_(SSSP+2)]
+	mov	sp, [cs:BP_(SSSP)]
+%else
+	lss	sp, [BP_(SSSP)]
+%endif
+
+	restore
+	restore
+	popf
+%ifndef STGY
+Strategy
+%endif
+	retf
+
+
+Drive	; overwrites the help screen
+
+;SDASave
+
+
+;============================================================================
+;  everything below this line is discarded after installing the driver
+
+CopyrightMsg
+dln "SHSUFDRV by Jason Hood <jadoxa@yahoo.com.au>."
+dln "Version 1.02 (21 December, 2005). Freeware."
+dln "http://shsufdrv.adoxa.cjb.net/"
+dlz
+
+HelpMsg
+dln "Simulate a floppy or hard disk using an image file."
+dln
+dln "SHSUFDRV [/F[:][?]]image[,drive]... [/W] [/V] [/U] [/Q[Q]]"
+dln
+dln "   image   Filename of raw disk image; '?' will ignore an invalid image."
+dln "   drive   Drive letter to use (default is first available)."
+%ifdef RW
+dln "   /W      Allow images to be written."
+%else
+dln "   /W      Ingored (images are read-only)."
+%endif
+dln "   /V      Display memory usage (only at install)."
+dln "   /U      Unload."
+dln "   /Q      Quiet - don't display sign-on banner."
+dln "   /QQ     Really quiet - don't display anything."
+dln
+dln "Notes:"
+dln "  * No drive letter will be assigned lower than the first."
+dln "      Eg: img1,E img2,D will assign to E: and F:, *not* E: and D:."
+dln "  * Only the drive (on the first partition of a hard disk) is simulated,"
+dln "    not the disk itself, and only a 512-byte sector size."
+dln
+dln "ERRORLEVEL is set to:"
+dln "  * the first drive assigned (A: = 1) on successful install;"
+dln "  * 0 on successful uninstall or this help is displayed;"
+dlz "  * 255 if not able to (un)install."
+
+%define ln 13,10
+%define ht 9
+
+%ifndef i8086
+WrongCPUMsg		dlz "Must have at least a 386."
+%endif
+WrongDOSMsg		dlz "Must be DOS 4 or later."
+
+InstallMsg		dlz ln,"SHSUFDRV image driver installed."
+UnInstallMsg		dlz ln,"SHSUFDRV uninstalled and memory freed."
+CouldNotRemoveMsg	dlz ln,"SHSUFDRV can't uninstall."
+NotInstalledMsg 	dlz ln,"SHSUFDRV not installed."
+FileNotFoundMsg 	dlz ht,": failed to open"
+InvalidImageFileMsg	dlz ht,": unrecognized image"
+NoDrivesAvailMsg	dlz ht,": out of drive letters"
+DriveMsg		db  ht,": Drive A"
+DriveLetter		ib
+CRLF			dlz
+
+MemoryUsage		dln
+			dz  "Memory Usage"
+MemoryHigh		dlz		" (loaded high)"
+MemoryBytes		db  "  Static:  "
+MemoryStatic		dln	       "0000 bytes"
+			db  "  Dynamic: "
+MemoryDynamic		dln	       "0000 bytes"
+			db  "  SDA:     "
+MemorySDA		dln	       "0000 bytes"
+			db  "  Total:   "
+MemoryTotal		dlz	       "0000 bytes"
+
+
+section .bss align=1
+FName		resb	128
+buf		resb	SectorSize
+DPBChain	resd	1
+LoL		resd	1
+CDSbase 	resd	1
+ResSeg		resw	1
+HiDrive 	resb	1		; \ number of block units
+NumDrives	resb	1		; / lastdrive
+
+section .text
+DOffset 	dw	Drive
+LoDrive 	db	0ffh		; lowest assigned drive letter
+
+Quiet		dflg	off
+Silent		dflg	off
+Ignore		dflg	off
+
+%define BootBPB buf+11			; offset of BPB in boot sector
+
+
+%ifdef DOSMOVES
+; DR-DOS moves the DOS segment between CONFIG and AUTOEXEC, so SHSUFDRV will
+; not work if it's INSTALLed. Fortunately, Int31 points to it (v7.01.07).
+; This code gets relocated before SDASave, if required.
+; Update: the latest version has INSTALLLAST, so this is no longer needed.
+SetDOSseg
+%ifdef i8086
+	zero	bx
+	mov	ds, bx
+%else
+	ld	ds, 0
+%endif
+	mov	bx, [31h*4+2]
+	mov	[BP_(SDAp+2)], bx
+	mov	bx, [cs:si+DriveEntry.Handle]
+	ret
+SetDOSseg_size equ $-SetDOSseg
+
+
+;+
+; FUNCTION : InitDOSseg
+;
+;	Relocate the DR-DOS DOS segment code.
+;
+; Parameters:
+;	[SDAp+2] := DOS segment
+;	[DOffset] := address of relocation
+;
+; Returns:
+;	[DOffset] updated
+;
+; Destroys:
+;
+;-
+InitDOSseg
+	uses	si,cx
+	save	ds
+	 zero	ax
+	 mov	ds, ax
+	 mov	ax, [31h*4+2]
+	restore
+	retif	[SDAp+2] ,ne, ax	; not DR-DOS
+	ld	es, ds
+	mov	si, SetDOSseg
+	mov	di, [DOffset]
+	mov	cx, SetDOSseg_size
+	rep	movsb
+	mov	ax, [DOffset]
+	sub	ax, ReadImage+4
+	movw	[ReadImage], 0e890h	; NOP, CALL
+	mov	[ReadImage+2], ax
+	mov	[DOffset], di
+	return
+%endif
+
+
+;+
+; FUNCTION : MsgOut
+;
+;	Output a NUL-terminated string.
+;
+; Parameters:
+;	SI -> message
+;
+; Returns:
+;	Nothing.
+;
+; Destroys:
+;	AX,DL,SI
+;-
+MsgOut
+	retif	[Silent]
+	mov	ah, 02h 		; display ch function
+	when
+	 prch.	al
+	while
+	 lodsb
+	is al nzr
+	return
+
+%macro Output 0-1.nolist
+  %if %0 == 1
+	mov	si, %1
+  %endif
+	call	MsgOut
+%endmacro
+
+
+Dont:	mov	si, NotInstalledMsg
+Xit:	Output
+	exit	255
+RC	equ	$-4
+
+
+;+
+; FUNCTION : Entry point
+;-
+..start
+	ld	ds, cs
+	mov	[PSP], es
+	cld
+
+%ifndef i8086
+	; check processor. Based on code by Henrik Haftmann.
+	cpu	8086
+	mov	si, WrongCPUMsg
+	push	sp			; Check for 80286
+	pop	ax
+	jif	ax ,ne, sp, Xit
+	pushf				; Now check for 386
+	pop	ax
+	or	ax, 7000h
+	push	ax
+	popf
+	pushf
+	pop	ax
+	jif	ax ,&!, 7000h, Xit
+	cpu	386
+%endif
+
+	mov	al, '?'                 ; /? help
+	call	FindOpt
+	if nc
+	 Output CopyrightMsg
+	 mov	si, HelpMsg
+	 mov	[RC], ch		; CH zero from command line length
+	 jmp	Xit
+	fi
+
+	; get DOS version
+	mov	si, WrongDOSMsg
+	dos	30h
+	jif	al ,b, 4, Xit
+
+	call	Initialise
+
+	mov	al, 'Q'                 ; /Q quiet/silent
+	call	FindOpt
+	if nc
+	 sflg.	[Quiet]
+	 mov	al, [es:di]
+	 cbit	al, 5
+	 if. {al ,e, 'Q'}, sflg. [Silent]
+	fi
+
+	mov	al, 'U'                 ; /U uninstall driver
+	call	FindOpt
+	jnc	UnInstall
+
+%ifdef RW
+	mov	al, 'W'                 ; /W write
+	call	FindOpt
+	cmovby nc, [oprw], 0c2h
+%endif
+
+	ifnflg	[Quiet], \
+	 Output CopyrightMsg
+
+	mov	di, 81h 		; command line
+	movzx.	cx, [es:di-1]		; byte before it is its length
+	while
+	 call	FindImage		; [/F:]filename
+	is nc
+	 call	MoveName
+	 save	es,di,cx
+
+	 ; canonicalize and display filename
+	 mov	si, FName
+	 ld	es, ds
+	 mov	di, buf
+	 dos	60h
+	 Output di
+
+	 ; open the file, see if it's a valid image
+	 mov	bx, 40c0h	; read-only, deny none, private, auto-commit
+oprw	 iw
+	 mov	dx, 1		; open if exists, fail if not
+	 mov	si, FName
+	 dos	6c00h
+%ifdef RW
+	 if c AND {bl ,e, 0c2h} ; try opening read-only if read/write fails
+	  mov	bl, 0c0h
+	  dos	6c00h
+	 fi
+%endif
+	 mov	si, FileNotFoundMsg
+	 jc	.noimg
+	 xchg	bx, ax
+	 zero	cx		; floppy
+	 zero	dx
+	 call	CheckImage
+	 if ne AND {word [buf+1feh] ,e, 0aa55h} ; valid boot record?
+	  mov	dh, [buf+1beh+8]	; sectors preceding first partition
+	  mov	cx, [buf+1beh+9]
+	  shl	dh, 1
+	  rcl	cx, 1
+	  call	CheckImage
+	 fi
+	 if e
+	  mov	di, [DOffset]	; DriveEntry.BPB
+	  mov	[di+DriveEntry.Handle], bx
+	  sthl	cx,dx, di+DriveEntry.Offset
+	  mov	si, BootBPB
+	  mov	cx, BPB_size
+	  save	di
+	   rep	movsb
+	  restore
+	  movb	[di+BPB.MediaDesc], 0f8h
+	  mov	cl, [DriveLetter]
+	  call	FindAvailDrive
+	  mov	si, NoDrivesAvailMsg
+	  fi c
+	  mov	ch, [Units]
+	  mov	[di+DriveEntry.DPB+DPB.DriveNumber], cx ; DPB.UnitNumber
+	  add	cl, 'A'
+	  mov	[DriveLetter], cl
+	  addw	[DOffset], DriveEntry_size
+	  incb	[Units]
+	  incb	[iUnits]
+	  mov	si, DriveMsg
+	  zero	bx
+	 fi
+	 ; close the file if error
+	 ifnz bx
+	  dos	3eh
+.noimg:   cmovby {!,[Ignore]}, [Units], -128
+	 fi
+	 Output
+	 restore
+	wend
+
+	jifb	[Units] ,le, 0, Dont
+
+	; get the SDA ptr
+	save	ds
+	 dos	5d06h
+	 mov	[cs:SDAp+2], ds
+	restore
+%ifdef DOSMOVES
+	call	InitDOSseg
+%endif
+	inc	cx			; ensure size is even
+	shr	cx, 1
+	mov	[SDASize], cx
+	mov	[SDAp], si
+	mmovw	[SDASave1], [DOffset]
+	mov	[SDASave2], ax
+	mov	[RelocSize], ax
+	add	cx, cx
+	add	[DOffset], cx
+
+	mov	al, 'V'                 ; /V display memory usage
+	mov	es, [PSP]
+	call	FindOpt
+	if. nc, \
+	 call	DisplayMemory
+	Output	InstallMsg
+
+	call	SetRoot
+	call	Link
+
+	mov	es, [PSP]
+	zero	ax
+	xchg	ax, [es:2Ch]		; find environment and release it
+	mov	es, ax
+	dos	49h
+
+	mov	dx, [DOffset]
+	add	dx, 4fh 		; first 40h bytes of PSP and rounding
+	mov	cl, 4
+	shr	dx, cl			; para to keep
+
+	mov	al, [LoDrive]		; return first assigned drive number
+	inc	ax			; A: = 1
+	dos	31h			; stay resident and exit
+
+
+;+
+; FUNCTION : Link
+;
+;	Link the driver into the device chain and relocate into the PSP.
+;
+; Parameters:
+;	[HiDrive] := highest assigned drive number (A=0)
+;
+; Returns:
+;
+; Destroys:
+;
+;-
+Link
+	les	bx, [LoL]
+	mov	al, [HiDrive]
+	inc	ax
+	mov	[es:bx+20h], al 	; set new block "count"
+
+	add	bx, 22h 		; ES:BX[22] is NUL device header
+	mmovd	NextDriver, es:bx	; put NUL.next in our header
+	mov	ax, [ResSeg]
+	zero	si ; = FDRVHdr
+	sthl	ax,si, es:bx		; point NUL header at us
+
+	; relocate into the PSP
+	mov	es, ax
+	zero	di
+	mov	cx, i(RelocSize)
+RelocSize iw
+	rep	movsb
+	ret
+
+
+;+
+; FUNCTION : UnInstall
+;
+;	Remove the driver from the device chain, close the files
+;	and free the memory (via DOS exit).
+;
+; Parameters:
+;	ES := PSP
+;
+; Returns:
+;
+; Destroys:
+;
+;-
+UnInstall
+	push	es			; save our PSP address
+	 les	bx, [LoL]		; get list of list
+	 add	bx, 22h 		; ES:BX[22] is NUL (1st) device header
+	 repeat
+	  ses	bx, buf 		; save current header addr
+	  les	bx, [es:bx]		; load next header addr into ES:BX
+	  inc	bx			; end of drivers?
+	  jz	.DriverNotFound
+	  dec	bx
+	  mov	cx, 7
+	  mov	si, DeviceName		; DS:SI is our device name
+	  lea	di, [bx+si]		; ES:DI is chained device name
+	  repe	cmpsb			; if eq it's the one we are looking for
+	 until e
+	 mov	ax, es
+	 mov	[ResSeg], ax		; store segment (offset is zero)
+	 les	di, [buf]		; previous header now in ES:DI
+	 mov	ds, ax			; ES:BX is addr of driver being removed
+	 mov	si, bx			; put it into DS:SI
+	 times 2 movsw			; move address DS:SI -> ES:DI
+	 sub	ax, 4			; locate the PSP of installed driver
+	 mov	ds, ax			;
+	pop	ax			; our PSP address (pushed ES above)
+	mov	[16h], ax		; make us parent of TSR
+	sthl	cs,.UnInstallExit, 10	; set TSR's terminate address
+	mov	bx, ds			; now make TSR's PSP the
+	dos	50h			; current PSP
+	sss	sp, cs:buf		; save stack info
+	exit				; terminate TSR and come back to next
+
+.UnInstallExit:
+	ld	ds, cs			; reestablish addressing
+	lss.	sp, buf 		; and stack info
+
+	; trace the DPB chain to remove the drives
+	zerob	[HiDrive]
+	les	bx, [LoL]
+	do
+	 les	bx, [es:bx]
+	 ifzw [es:bx+DPB.Device]
+	  mov	ax, [es:bx+DPB.Device+2]
+	 andif ax ,e, [ResSeg]
+	  call	ClrRoot
+	  save	ds,es
+	  ld	ds, es
+	  les	di, [cs:buf]
+	  add	di, DPB.NextDPB
+	  lea	si, [bx+DPB.NextDPB]
+	  times 2 movsw 		; unlink (prev->next = our->next)
+	  restore
+	 else
+	  mov	al, [es:bx+DPB.DriveNumber]
+	  cmov {al ,a, [HiDrive]}, [HiDrive], al
+	  ses	bx, buf
+	 fi
+	 add	bx, DPB.NextDPB
+	whilew [es:bx] ,ne, 0ffffh
+
+	les	bx, [LoL]		; restore block count
+	mov	al, [HiDrive]
+	inc	ax
+	mov	[es:bx+20h], al
+
+	mov	si, UnInstallMsg
+	zerob	[RC]
+	jmp	Xit
+
+.DriverNotFound:
+	mov	si, CouldNotRemoveMsg
+	jmp	Xit
+
+
+;+
+; FUNCTION : SetRoot
+;
+;	Set the Current Directory Structure with the new drives.
+;	Create and link in the DPBs.
+;
+; Parameters:
+;
+; Returns:
+;	[LoDrive] and [HiDrive] set as appropriate
+;
+; Destroys:
+;
+;-
+SetRoot
+	mov	dx, [ResSeg]
+	movzx.	cx, [Units]
+	for	si, Drive, *,, DriveEntry_size
+	 mov	al, CDS_size
+	 mov	bl, [si+DriveEntry.DPB+DPB.DriveNumber]
+	 cmov {bl ,b, [LoDrive]}, [LoDrive], bl
+	 cmov {bl ,a, [HiDrive]}, [HiDrive], bl
+	 les	di, [CDSbase]
+	 mul	bl
+	 add	di, ax
+	 mov	ax, 'A:'
+	 add	al, bl
+	 stosw				; CDS.CurrPath
+	 mov	ax, '\'
+	 stosw
+	 add	di, CDS.Flags - 4
+	 mov	ax, 4000h		; physical
+	 stosw
+	 lea	ax, [si+DriveEntry.DPB]
+	 mov	bp, ax
+	 stosw				; CDS.DPB
+	 mov	ax, dx
+	 stosw
+	 mov	ax, 0ffffh		; CDS.CurDir - never accessed
+	 stosw
+	 stosw				; CDS.FFFF
+	 stosw
+	 mov	ax, 2			; CDS.RootOff
+	 stosw
+	 mov	al, 0
+	 stosb				; CDS.Type
+	 stosw				; CDS.IFSRedir
+	 stosw
+
+	 ld	es, ds
+	 dos	53h			; DPB at DS:SI from BPB at ES:BP
+	 lea	di, [bp+DPB.Device]
+	 zero	ax ; = RDRVHdr
+	 stosw
+	 mov	ax, dx
+	 stosw
+	 inc	di			; skip DPB.MediaID
+	 mov	ax, 0ffffh
+	 stosb				; DPB.Accessed
+	 stosw				; DPB.NextDPB
+	 stosw
+
+	 les	di, [DPBChain]
+	 sthl	dx,bp, es:di+DPB.NextDPB
+	 sds	bp, DPBChain
+	next
+	ret
+
+
+;+
+; FUNCTION : ClrRoot
+;
+;	Remove the drive from the Current Directory Structure.
+;
+; Parameters:
+;	ES:BX -> DPB
+;
+; Returns:
+;
+; Destroys:
+;
+;-
+ClrRoot
+	uses	es
+	mov	al, CDS_size
+	mulb	[es:bx+DPB.DriveNumber]
+	les	di, [CDSbase]
+	add	di, ax
+	zero	ax
+	mov	[es:di+CDS.CurrPath+3], al ; reset path to root
+	add	di, CDS.Flags
+	stosw				; clear drive flags
+	stosw				; clear CDS.DPB
+	stosw
+	return
+
+
+;+
+; FUNCTION : CheckImage
+;
+;	Read the BPB from the image and check for a 512-byte sector size.
+;
+; Parameters:
+;	CX:DX := offset of boot sector
+;	   BX := handle of image file
+;
+; Returns:
+;	ZR if valid image
+;	NZ if invalid image
+;	   SI -> error message
+;
+; Destroys:
+;
+;-
+CheckImage
+	uses	cx,dx
+	dos	4200h
+	mov	dx, buf
+	mov	cx, SectorSize
+	dos	3fh
+	mov	si, InvalidImageFileMsg
+	if {ax ,e, cx} AND {word [buf+510] ,e, 0aa55h}
+	 ; see if we have a 512-byte sector
+	 cmpw	[BootBPB+BPB.BytesPerSector], SectorSize
+	fi
+	return
+
+
+;+
+; FUNCTION : Initialise
+;
+;	Get the last DPB in the chain, the highest available drive letter
+;	and the CDS pointer.
+;
+; Parameters:
+;
+; Returns:
+;
+; Destroys:
+;
+;-
+Initialise
+	save	es				; PSP
+
+	dos	52h				; List of Lists
+	ses	bx, LoL
+
+	mmovd	CDSbase, es:bx+16h		; Current Directory Structure
+	mov	ax, [es:bx+20h] 		; block units, lastdrive
+	dec	ax
+	mov	[HiDrive], ax			; NumDrives
+
+	do
+	 les	bx, [es:bx]			; first DPB
+	 add	bx, DPB.NextDPB
+	whilew [es:bx] ,ne, 0ffffh
+	sub	bx, DPB.NextDPB
+	ses	bx, DPBChain
+
+	restore
+	mov	bx, es				; resident code is relocated
+	add	bx, 4				;  into the PSP
+	mov	[ResSeg], bx
+
+	ret
+
+
+;+
+; FUNCTION : FindAvailDrive
+;
+;	Find first available drive letter.
+;
+; Parameters:
+;	CL := start letter (0 = A)
+;
+; Returns:
+;	CY if no drive available
+;	CL := drive letter found
+;
+; Destroys:
+;
+;-
+FindAvailDrive
+	mov	al, CDS_size
+	mul	cl
+	les	si, [CDSbase]
+	add	si, ax
+	for	si,, {cl ,be, [NumDrives]}, CDS_size
+	 retifb [es:si+CDS.Flags+1] ,&!, 0C0h  ; drive in use? (clears carry)
+	 inc	cx
+	next
+	stc
+	return
+
+
+;+
+; FUNCTION : DisplayMemory
+;
+;	Display the memory usage.
+;
+; Parameters:
+;	[DOffset] := last byte
+;	[SDASize] := word-size of SDA
+;
+; Returns:
+;
+; Destroys:
+;
+;-
+DisplayMemory
+	Output	MemoryUsage
+	cmpw	[ResSeg], 0A000h
+	cmov	si, ae, MemoryHigh, CRLF
+	Output
+	mov	ax, [DOffset]
+	add	ax, 40h 		; PSP
+	add	ax, 15			; round to
+	and	al, ~15 		;  paragraph
+	mov	si, MemoryTotal+3
+	mov	bx, ax
+	call	itoa
+	mov	ax, [SDASize]
+	add	ax, ax
+	mov	si, MemorySDA+3
+	sub	bx, ax
+	call	itoa
+	mov	ax, 40h + Drive
+	mov	si, MemoryStatic+3
+	sub	bx, ax
+	call	itoa
+	xchg	ax, bx
+	mov	si, MemoryDynamic+3
+	call	itoa
+	Output	MemoryBytes
+	ret
+
+
+;+
+; FUNCTION : itoa
+;
+;	Convert a binary number to a space-padded string.
+;
+; Parameters:
+;	AX := number
+;	SI -> buffer
+;
+; Returns:
+;
+; Destroys:
+;
+;-
+itoa
+	mov	di, 10			; base
+	mov	cx, 5			; one more, to avoid for0
+	repeat
+	 zero	dx
+	 div	di
+	 add	[si], dl
+	 dec	si
+	 dec	cx
+	until ax zr
+	for	si,,*,,-		; fill remainder with spaces
+	 movb	[si], ' '
+	next
+	ret
+
+
+;+
+; FUNCTION : MoveName
+;
+;	Copy the image filename from the command line to local storage
+;	and NUL-terminate it.
+;
+; Parameters:
+;	ES:DI -> name
+;	   CX := length of command line
+;
+; Returns:
+;	DI & CX updated
+;
+; Destroys:
+;
+;-
+MoveName
+	mov	si, FName
+	zerob	[si]
+	cflg	[Ignore]
+	ifb [es:di] ,e, '?'
+	 sflg.	[Ignore]
+	 inc	di
+	 dec	cx
+	fi
+	retif	cxz
+	repeat
+	 mov	al, [es:di]
+	 mov	[si], al
+	 inc	si
+	 inc	di
+	next al ,ne, {',',' ','/'}
+	if. e,	dec si
+	mov	[si], ch
+
+	if {al ,e, ','} AND cxnz
+	 mov	al, [es:di]
+	 inc	di
+	 dec	cx
+	 cbit	al, 5
+	 ifb {[es:di] ,e, ':'} AND cxnz
+	  inc	di
+	  dec	cx
+	 fi
+	else
+.ret:	 mov	al, 0
+	fi
+	if {al ,be, [DriveLetter]} OR {al ,ae, 'A'+32}
+	 mov	al, [DriveLetter]
+	 inc	ax
+	fi
+	sub	al, 'A'
+	mov	[DriveLetter], al
+	ret
+
+
+;+
+; FUNCTION : FindImage
+;
+;	Search the command line for an image parameter (/F or filename).
+;
+; Parameters:
+;       ES:DI -> command line
+;	   CX := length of command line
+;
+; Returns:
+;	NC if found
+;	   ES:DI -> parameters
+;	   CX := length
+;	CY if not found
+;
+; Destroys:
+;
+;-
+FindImage
+	while
+	 call	GetNextParm
+	 break	c OR {al ,e, 0,'F'}
+	 call	SkipParm
+	wend
+	ret
+
+
+;+
+; FUNCTION : FindOpt
+;
+;	Scans command line for argument of form /X or -X where
+;	X = specified ASCII character. Presumes that argument is preceded
+;	by a '/' or a '-'. Comparisons are case insensitive.
+;
+; Parameters:
+;	AL := option character to scan for (uppercase)
+;	ES := PSP segment
+;
+; Returns:
+;	NC if found, CY if not
+;	ES:DI -> remaining command line
+;	   CX := chars left on command line
+;
+; Destroys:
+;
+;-
+FindOpt
+	mov	di, 80h 		; command line length PSP +80h
+	movzx.	cx, [es:di]
+	inc	di
+	;if. {al ,[], 'a','z'}, cbit al, 5 ; Make character upper case
+	mov	ah, al
+	while
+	 call	GetNextParm
+	 break	c OR {ah ,e, al}
+	 call	SkipParm
+	wend
+	ret
+
+
+;+
+; FUNCTION : GetNextParm
+;
+;	Get the next command line parameter.
+;
+; Parameters:
+;	ES:DI -> address of command line
+;	   CX := command line length
+;
+; Returns:
+;	CY if no more parameters
+;	NC if parameter found
+;	   AL := 0 if parameter doesn't start with '/' or '-'
+;		 uppercase option character if it does
+;	ES:DI -> pointer to argument (parameter or option's value)
+;	   CX := chars left on command line
+;
+; Destroys:
+;
+;-
+GetNextParm
+	jcxz	.none			; nothing left
+	repeat				; skip blanks
+	 mov	al, [es:di]
+	 inc	di
+	next al ,e, ' '
+	je	.none			; nothing but blanks
+
+	if {al ,e, '/','-'} AND cxnz    ; Found option
+	 mov	al, [es:di]
+	 if. {al ,[], 'a','z'}, cbit al, 5
+	 inc	di
+	 dec	cx
+	 ifb [es:di] ,e, ':'            ; skip over option/value separator
+	  inc	di			; (no need to test length)
+	  dec	cx
+	 fi
+	 clc
+	 ret
+	fi
+	dec	di			; point back to the parameter
+	inc	cx
+	zero	al			; clears carry
+	ret
+
+.none:	stc
+	ret
+
+
+;+
+; FUNCTION : SkipParm
+;
+;	Skip the remaining characters of a parameter.
+;
+; Parameters:
+;	ES:DI -> address of command line
+;	   CX := command line length
+;
+; Returns:
+;	ES:DI -> pointer to next parameter
+;	   CX := chars left on command line
+;
+; Destroys:
+;
+;-
+SkipParm
+	repeat0
+	 mov	al, [es:di]
+	 inc	di
+	next {al ,ne, ' ','/'}          ; '-' only starts an option
+	if e				; need to point back to '/'
+	 dec	di
+	 inc	cx
+	fi
+	ret
+
+
+group dgroup text bss
+
+segment stack stack
+	resw	80

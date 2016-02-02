@@ -1,0 +1,46 @@
+                          SHSUDRVX Version 1.1
+                      (c) John H. McCoy, May 1996
+                    Sam Houston St. Univ., TX 77341-2206
+
+     SHSUDRVX is a CD driver/controller emulator I have found useful for
+     test purposes.  It emulates two 2 CD drives loaded with ISO ROMS.
+
+     Drive 0 has a single text file in the root directory.  This file is
+     also listed in the Abstract field of the primary volume descriptor(PVD).
+     The file name in the directory entry contains lower case charaters for
+     test purpose.  There is also a text string in the BiblioID field for
+     test purposes.
+
+     In the root directory of Drive 1 there is a copyright file and a sub-
+     directory.  The copyright file is a text file and is listed in the PVD
+     copyright ID field.  The HELLO.EXE in the HELLO sub-directory is
+     executable.
+
+     SHSUDRVX is loaded from the command line before loading a re-director
+     such as SHSUCDX.
+
+     UsageMsg:  SHSUDRVX [/?][/D:DriverName][/U]
+
+        The default driver name is CD001.
+
+     IOCTL input functions supported:
+        Return address of Device Header
+        Device status
+        Return sector size
+        Media changed
+           reports -- not changed if drive door is closed and locked
+                   -- don't know if door closed and unlocked
+                   -- changed if door is open
+
+     IOCTL output functions supported:
+        Eject disk  -- don't unless you can close it!!!
+        Lock/Unlock door
+        Reset drive
+        Close door
+
+Time permitting, an attempt will be made to fix problems that are reported
+  to CSC_JHM@SHSU.EDU.
+
+SHSUCDX is a copyright reserved, free use program.  Use at your own risk.
+
+(c)John H. McCoy, August 1993, 1995, 1996 Sam Houston St. Univ., TX 77341-2206

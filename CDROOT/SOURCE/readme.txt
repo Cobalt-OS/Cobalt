@@ -1,0 +1,1 @@
+This folder contains the source code for all programs and components in either the Carbon OS install disc or Carbon OS itself.

@@ -27,6 +27,11 @@ There are two main packages in the installer. The first, `BASE.ZIP`, contains th
 
 ---------------------------------------------------------
 
+__New in Cobalt 1.0:__
+* Initial Release
+
+---------------------------------------------------------
+
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or

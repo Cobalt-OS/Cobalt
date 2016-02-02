@@ -1,0 +1,20 @@
+version 1.0 (2001-09-07)
+------------------------
+- initial release
+
+version 1.1 (2003-02-06)
+------------------------
+- fixed a bug which permitted to specifiy more than 2 file arguments
+  (My thanks go to Jim Hall for discovering this bug.)
+- fixed a bug which prevented to specify a not existing destination path
+  (My thanks go to Andreas Maurer for discovering this bug.)
+- fixed compiler warnings
+- removed switch /F ("destination is a file")
+- renamed switch /D ("destination is a directory") to /I for better
+  MS-DOS compatibility
+- implemented check of path length
+- implemented switch /D (date)
+- implemented switch /T (copy only directory tree)
+- implemented switch /L (list mode)
+- implemented switch /F (show full names)
+- implemented switch /C (continue)

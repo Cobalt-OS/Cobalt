@@ -1,0 +1,142 @@
+#   eXtended FDisk I
+#   ----------------------------------------------------------------------
+#   Copyright (c) 1994-99 by Florian Painke (f.painke@gmx.de).
+
+#   MAKEFILE
+#   Borland Pascal 7.0 Makefile for DOS
+
+#   This program is free software; you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation; either version 2 of the License, or
+#   (at your option) any later version.
+
+#   This program is distributed in the hope that it will be useful, but
+#   WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+#   General Public License for more details.
+
+#   You should have received a copy of the GNU General Public License
+#   along with this program; if not, write to
+#       Free Software Foundation, Inc.
+#       59 Temple Place - Suite 330
+#       Boston, MA 02111-1307, USA
+#   or visit the GNU Homepage at http://www.gnu.org/.
+
+.silent
+.autodepend
+
+# Version Number
+!ifndef VERSION
+VERSION =   1084B
+!endif
+
+# Languages
+LANGUAGES =\
+    DE\
+    EN\
+    NL
+
+#Active language
+!ifndef LANG
+LANG =  DE
+!endif
+
+# Directories
+INC_DIR =   $(LANG)
+LANG_DIR =  $(LANG)
+BIN_DIR =   $(LANG_DIR)\BIN
+
+# Options
+!ifdef DEBUG
+MAKE_OPTS = -S -DDEBUG
+BPC_OPTS =  /CD /I$(INC_DIR) /DDEBUG /V /$G+ /$I- /$P+ /$Q+ /$R+
+ASM_OPTS =  /dLANG='$(LANG)' /i$(INC_DIR) /m /mu /dDEBUG /w2
+LINK_OPTS = /t
+!else
+MAKE_OPTS = -S
+BPC_OPTS =  /CD /I$(INC_DIR) /$D- /$G+ /$I- /$L- /$P+ /$Q+ /$R- /$Y- /$E-
+ASM_OPTS =  /dLANG='$(LANG)' /i$(INC_DIR) /m /mu
+LINK_OPTS = /t
+!endif
+
+# Dependants
+XFDISK =\
+    XFDISK.PAS\
+    XBOOTM.INC\
+    XIO.INC\
+    XMENU.INC\
+    XPART.INC\
+    XTYPES.INC
+
+
+
+# Targets
+all :
+    echo Building ($(LANGUAGES))...
+    for %i in ($(LANGUAGES)) do make $(MAKE_OPTS) -DLANG=%i all-lang
+
+all-lang :  $(BIN_DIR)\XFDISK.EXE
+    echo $(LANG) done.
+
+clean :
+    echo Cleaning up ($(LANGUAGES))...
+    if exist *.bak del *.bak
+    if exist *.obj del *.obj
+    if exist *.map del *.map
+    if exist *.tpu del *.tpu
+    if exist *.exe del *.exe
+    for %i in ($(LANGUAGES)) do make $(MAKE_OPTS) -DLANG=%i clean-lang
+
+clean-lang :
+    if exist $(LANG_DIR)\*.bak del $(LANG_DIR)\*.bak
+    if exist $(LANG_DIR)\*.bin del $(LANG_DIR)\*.bin
+    if exist $(LANG_DIR)\*.exe del $(LANG_DIR)\*.exe
+    if exist $(LANG_DIR)\*.zip del $(LANG_DIR)\*.zip
+    if exist $(BIN_DIR)\*.bak del $(BIN_DIR)\*.bak
+    if exist $(BIN_DIR)\*.exe del $(BIN_DIR)\*.exe
+    echo $(LANG) done.
+
+archive :
+    echo Archiving ($(LANGUAGES))...
+    for %i in ($(LANGUAGES)) do make $(MAKE_OPTS) -DLANG=%i archive-lang
+
+archive-lang :  $(LANG_DIR)\XFD$(VERSION).ZIP
+    echo $(LANG) done.
+
+$(BIN_DIR)\XFDISK.EXE : $(LANG_DIR)\XFDISK.EXE $(LANG_DIR)\MBR.BIN $(LANG_DIR)\MENU.BIN SETCHECK.EXE
+!ifndef DRDOS
+    copy /B $(LANG_DIR)\$.+$(LANG_DIR)\MBR.BIN+$(LANG_DIR)\MENU.BIN $(BIN_DIR)\$.
+!else
+    copy $(LANG_DIR)\$.+$(LANG_DIR)\MBR.BIN+$(LANG_DIR)\MENU.BIN $(BIN_DIR)\$. /B
+!endif
+    setcheck $(BIN_DIR)\$.
+
+$(LANG_DIR)\XFDISK.EXE :    $(XFDISK) $(LANG_DIR)\LANGUAGE.INC MISC.TPU DISKCTRL.TPU CHKSIZE.EXE MAKEFILE
+    bpc $(BPC_OPTS) $&
+    chksize $. $(LANG_DIR)\$&.INC
+    move $. $(LANG_DIR)
+
+DISKCTRL.TPU :  DISKCTRL.PAS MAKEFILE
+    bpc $(BPC_OPTS) $&
+
+MISC.TPU :  MISC.PAS MAKEFILE
+    bpc $(BPC_OPTS) $&
+
+$(LANG_DIR)\MBR.BIN :   MBR.ASM $(INC_DIR)\MBR.ASI MAKEFILE
+    tasm $(ASM_OPTS) $&
+    tlink $(LINK_OPTS) $&,$&.BIN
+    move $. $(LANG_DIR)
+
+$(LANG_DIR)\MENU.BIN :  MENU.ASM $(INC_DIR)\MENU.ASI MAKEFILE
+    tasm $(ASM_OPTS) $&
+    tlink $(LINK_OPTS) $&,$&.BIN
+    move $. $(LANG_DIR)
+
+SETCHECK.EXE :  SETCHECK.PAS MAKEFILE
+    bpc $(BPC_OPTS) $&
+
+CHKSIZE.EXE : CHKSIZE.PAS MAKEFILE
+    bpc $(BPC_OPTS) $&
+
+$(LANG_DIR)\XFD$(VERSION).ZIP :  $(BIN_DIR)\XFDISK.EXE
+    zip -j $(LANG_DIR)\$. GPL.TXT $(BIN_DIR)\*

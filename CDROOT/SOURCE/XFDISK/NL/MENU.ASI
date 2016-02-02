@@ -1,0 +1,51 @@
+;	eXtended FDisk I
+;	----------------------------------------------------------------------
+;	Copyright (c) 1994-99 by Florian Painke (f.painke@gmx.de).
+
+;	MENU.ASI
+;	Boot Manager Menu Messages
+
+;	This program is free software; you can redistribute it and/or modify
+;	it under the terms of the GNU General Public License as published by
+;	the Free Software Foundation; either version 2 of the License, or
+;	(at your option) any later version.
+
+;	This program is distributed in the hope that it will be useful, but
+;	WITHOUT ANY WARRANTY; without even the implied warranty of
+;	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;	General Public License for more details.
+
+;	You should have received a copy of the GNU General Public License
+;	along with this program; if not, write to
+;		Free Software Foundation, Inc.
+;		59 Temple Place - Suite 330
+;		Boston, MA 02111-1307, USA
+;	or visit the GNU Homepage at http://www.gnu.org/.
+
+
+
+winln1  db 'ษอ Bootmanager ออออออออออออออออออออออออออออออออออออออป', 0
+winln2  db 'บ  Naam              Status   Grootte  Systeem       บ', 0
+winln2s db 'บ  Naam                                              บ', 0
+winln3  db 'วฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤถ', 0
+winln4  db 'บ                                                    บ', 0
+winln5  db 'บ /     INVOER     F1/F2: Disk A:      F5: Verberg บ', 0
+winln7  db 'ศออออออออออออออออออออออออออออออออออออออออออออออออออออผ', 0
+prtpri  db '  PRIMAIRE', 0
+prtlog  db '  LOGISCHE', 0
+prtsiz  db '      MB  ', 0
+msgtim  db 'Wachttijd:'
+timout  db '      secondes       ESC: Geen Wachttijd', 0
+msgnot  db 'Wachttijd: Geen', 0
+msgtin  db '                     ESC: Activeer', 0
+msgbot  db ' is aan opstarten. Even geduld a.u.b. ...', 13, 10, 0
+msgdsk  db 'Disk A:',0
+msgrr1  db 'Fout bij lezen Partitie Sector!', 0
+msgrr2  db 'Fout bij bewaren Partitie Sector!', 0
+msgrr3  db 'Fout bij lezen Bootsector!', 0
+msgnbs  db 'Ongeldig Besturingssysteem!', 13, 10, 0
+msginv  db 'Bootmanager is aangepast!', 13, 10, 0
+msgnoen db 'Ongeldig aantal Keuzes!', 13, 10, 0
+msgpwd  db 'Voer het Wachtwoord in a.u.b.: ', 0
+msgpinv db ' - Foutief Wachtwoord!', 13, 10, 0
+msgphlt db 'Systeem gestopt!', 13, 10, 0

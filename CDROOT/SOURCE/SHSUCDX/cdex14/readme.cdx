@@ -1,0 +1,112 @@
+                          SHSUCDX Version 1.4b
+                      (c) John H. McCoy, October 2000
+                           csc_jhm@shsu.edu
+
+     Version 1.4b fixed a problem with findfirst that caused a problem when
+        a program expected getting the volid would also set it up for
+        scanning the root directory with findnext.
+
+     Version 1.4a changes the dos version check so that it will run under
+        Windows ME without having to use set ver.  ME Dos reports version 8.
+
+     Version 1.4 increased the allowed length of directories from 64K bytes to
+        64K sectors (128 M bytes) to solve the problem of lost entries that
+        occurred when a directory exceeded 32 sectors.
+
+                          SHSUCDX Version 1.1a
+                      (c) John H. McCoy, May 1996
+                   Sam Houston St. Univ., TX 77341-2206
+
+     SHSUCDX is an un-loadable CD-ROM redirector substitute for MSCDEX.
+        Version 1.0 supports up to 10 CD drives.  Each drive is single
+        sector buffered and the last 10 directory entries are cached.
+        Hopefully, the directory function is finally fixed.  Lower case
+        characters in directory entries are now converted to upper case.
+        LC characters are not valid in ISO9660 directory entries but some
+        mastering programs put them in.  This change allows those files to
+        be accessed.  The BiblioID can now be read using INT 2F, 1504H.
+        The full 37 bytes of the Copyright and Abstract ID fields are now
+        returned.  Previously only the first 12 bytes were read.
+
+        Approx 17K of RAM is needed to install SHSUCDX.  The resident size
+        for a single drive is less than 11K.  Each additional drive increases
+        the resident size by 2500 bytes.  Multiple drivers are supported.
+        The driver name, drive letter, drive unit and number of drives from
+        each driver can be specified on the command line.
+
+        SHSUCDX does not attempt to read the CD ROM until an access request
+        is made.  Thus, the CD drive does not have to be ready when the
+        redirector is loaded.  If more than 7 seconds elapse between access
+        requests a media check is made.  The buffers and cache are flushed
+        and the CD is re-read only if the driver reports a media change.
+
+        When SHSUCDX unloads it marks the drives it used as invalid.
+
+     SHSUCDX has been run with MS-DOS 4, 5, 6 and 7 stand-alone, under
+        Windows 3.1, and in a specific DOS window under OS2.
+
+     A CD-ROM driver which supports the CD-ROM extensions must be loaded
+        before loading SHSUCDX.  By default, SHSUCDX looks for a driver
+        named SHSU-CDN.
+
+     usage:  SHSUCDX [/D:DriverName[,[Drive][,[Unit][,[MaxDrives]]]]]
+
+        DriverName  1 to 8 characters.
+        Drive       First drive letter to assign to drives attached to
+                       this driver.
+        Unit        First drive unit on this driver to be assigned to a
+                       drive letter.  (Allowed range 0 to 99)
+        MaxDrives   Maximum number of drives on this driver that are to
+                       be assigned to drive letters.
+
+        Note:  The drive letter assigned to units of a second driver will
+          always be higher than those assigned to the first driver and
+          those assigned to a third driver will be higher than those
+          assigned to the second.
+
+        example: SHSUCDX
+
+        SHSUCDX finds the first available drive letter and assigns it
+        to device unit 0 of the default driver SHSU-CDN.  If there is a
+        second and/or third CD drive they are assigned to the next avail-
+        able letters in sequence.  Drive letters in use are skipped.  The
+        first CD supported by a driver is device unit 0 regardless of its
+        SCSI address.
+
+        example: SHSUCDX /D:CD001,F,,1  /D:SHSU-CDN,,1
+
+        SHSUCDX assigns drive F to device unit 0 of the driver CD001.
+        Units 1 and 2 of driver SHSU-CDN are then assigned to the next
+        available letters.
+
+        example: SHSUCDX /D:CD001,,1,1  /D:CD001,,4,1
+
+        SHSUCDX assigns the first available drive letter to device unit 1
+        of the driver CD001 and drive unit 4 to the next.  This allows
+        access to non-contiguous drive units without having to support
+        un-needed units.
+
+     unload: SHSUCDX [-u|/u]
+
+     The following INT 2F, 15h functions are supported:
+
+        00      Get number of CD-ROM drives
+        01      Get CD-ROM drive device list
+        02      Get Copyright File ID
+        03      Get Abstract File ID
+        04      Get Bibliographic File ID
+        05      Read VTOC (1st only)
+        08      Absolute disk read
+        0B      CDROM drive check
+        0C      MSCDEX version
+        0D      Get CD-ROM drive letters
+        0F      Get directory Entry
+        10      Send device request
+
+
+Time permitting, an attempt will be made to fix problems that are reported
+  to CSC_JHM@SHSU.EDU.
+
+SHSUCDX is a copyright reserved, free use program.
+
+(c)John H. McCoy, 1994, 1995, 1996 Sam Houston St. Univ., TX 77341-2206

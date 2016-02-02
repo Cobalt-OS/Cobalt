@@ -1,0 +1,14 @@
+; drvon.nsm - Enable a drive.
+;
+; Jason Hood, 29 June, 2005.
+;
+; Simple program to enable a drive, since FORMAT will disable SHSU[FR]DRV.
+
+	org	100h
+
+	mov	dl, [82h]	; drive letter
+	or	dl, 20h 	; lowercase
+	sub	dl, 'a'         ; number
+	mov	ax, 5f07h	; enable drive
+	int	21h
+	ret

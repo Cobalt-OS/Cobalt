@@ -1,0 +1,29 @@
+
+	; findbin EAX.DL (sector, drive) returns CARRY (not found)
+	; or the sub-bin (in AX) that contains the sector.
+	; can as side-effect update some statistics embedded in
+	; the table.
+
+	; newbin EAX.DL allocates a new bin for the sector and
+	; marks the appropriate sub-bin as used. All other sub-bins
+	; are discarded from the affected main bin IF the main bin
+	; does not share the needed EAX.DL range!
+
+	; can use the table on position table directly, or use
+	; hashme EAX.DL to have a suggested pointer SI calculated
+	; which points into table. Can use sectors, which is the
+	; number of sub-bins (shr BINSHR to get the main table
+	; entry number - 8 byte per main table entry. and BINBITS
+	; to know sub-bin number, or "and low byte, BINMASK" to
+	; calculate EAX.DL of main bin from EAX.DL of sub-bin...
+
+	; macro BINBCHECK ARG does (all registers preserved):
+	; ARG [ds:si+6],bit 1 shl (al and BINBITS)
+	; where ARG can for example be OR or TEST
+
+        ; Table format: each 8 byte main bin is a struct:
+        ; DWORD EAX of sector 
+        ; BYTE  DL  of sector
+        ; BYTE  free for your findbin/newbin
+        ; WORD  bitmask: if bit N is set, sector EAX+N is in use
+

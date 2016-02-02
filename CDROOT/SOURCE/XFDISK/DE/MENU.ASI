@@ -1,0 +1,52 @@
+;	eXtended FDisk I
+;	----------------------------------------------------------------------
+;	Copyright (c) 1994-99 by Florian Painke (f.painke@gmx.de).
+
+;	MENU.ASI
+;	Boot Manager Menu Messages
+
+;	This program is free software; you can redistribute it and/or modify
+;	it under the terms of the GNU General Public License as published by
+;	the Free Software Foundation; either version 2 of the License, or
+;	(at your option) any later version.
+
+;	This program is distributed in the hope that it will be useful, but
+;	WITHOUT ANY WARRANTY; without even the implied warranty of
+;	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;	General Public License for more details.
+
+;	You should have received a copy of the GNU General Public License
+;	along with this program; if not, write to
+;		Free Software Foundation, Inc.
+;		59 Temple Place - Suite 330
+;		Boston, MA 02111-1307, USA
+;	or visit the GNU Homepage at http://www.gnu.org/.
+
+
+
+winln1  db 'ษอ Bootmanager ออออออออออออออออออออออออออออออออออออออป', 0
+winln2  db 'บ  Name              Status   Gr”แe    System        บ', 0
+winln2s db 'บ  Name                                              บ', 0
+winln3  db 'วฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤฤถ', 0
+winln4  db 'บ                                                    บ', 0
+winln5  db 'บ /     ENTER    F1/F2: Disk A:     F5: Ausblenden บ', 0
+winln7  db 'ศออออออออออออออออออออออออออออออออออออออออออออออออออออผ', 0
+prtpri  db '  PRIMR  ', 0
+prtlog  db '  LOGISCH ', 0
+prtsiz  db '      MB  ', 0
+msgtim  db 'Zeitlimit:'
+timout  db '      Sekunden       ESC: Kein Zeitlimit', 0
+msgnot  db 'Zeitlimit: Keines', 0
+msgtin  db '                  ESC: Aktivieren', 0
+msgbot  db ' wird gebootet. Bitte warten...', 13, 10, 0
+msgdsk  db 'Diskette A:',0
+msgrr1  db 'Fehler beim Lesen des Partitionssektors!', 0
+msgrr2  db 'Fehler beim Schreiben des Partitionssektors!', 0
+msgrr3  db 'Fehler beim Lesen des Bootsektors!', 0
+msgnbs  db 'Betriebssystem ungltig!', 13, 10, 0
+msginv  db 'Bootmanager wurde modifiziert!', 13, 10, 0
+msgnoen db 'Anzahl der Eintrge ungltig!', 13, 10, 0
+msgpwd  db 'Geben Sie bitte das Paแwort ein: ', 0
+msgpinv db ' - Paแwort ist falsch!', 13, 10, 0
+msgphlt db 'System angehalten!', 13, 10, 0
+
