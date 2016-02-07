@@ -1,0 +1,271 @@
+
+mTCP Design notes
+Michael Brutman, May 2011
+
+
+History
+
+  mTCP started in late 2005 with some simple attempts to send and receive
+  packets using a packet driver.  After a few days of frustration and
+  debugging I was able to reliably send arbitrary data down the wire.
+
+  By necessity the first protocol implemented was ARP.  IP and UDP came
+  next.  By 2007 I was working on TCP using what would become "netcat"
+  to test raw socket function.  In 2008 the TCP code was stable enough
+  to do my first fun application, IRCjr.  The name mTCP came later when
+  there were a few programs in the package.
+
+  The design of the code changed a lot from 2006 to 2008.  In the last
+  two years the base library has been fairly stable, and most of the
+  effort has gone into writing applications.
+
+
+
+Packet driver interfacing
+
+  mTCP uses packet drivers to send and receive data through Ethernet
+  cards.  Even for SLIP and PPP connections this is true - the packet
+  driver will emulate Ethernet, hiding that complexity from mTCP.
+
+  A packet driver is a TSR utility that provides two primary services - it
+  sends packets on your behalf and it tries to give you packets that it
+  receives from the Ethernet card.  The interface to the packet driver
+  is a combination of software interrupts and callbacks.  The code that
+  interfaces to the packet driver has to be fast and rock solid.
+
+  PACKET.CPP is the code responsible for interfacing to the packet
+  driver and for managing the buffers used by the packet driver.
+  The buffer management code is the important part; when a new packet
+  arrives a buffer needs to be provided to receive the contents of
+  the packet.  If a buffer is not available the packet is lost.
+
+  At program start up to 40 buffers can be allocated.  If each
+  buffer needs 1514 bytes of space that consumes 60KB, which fits
+  within an x86 segment.  More than 40 packet buffers are possible
+  but probably not needed.
+
+  Free buffers are put on the free list, which is implemented as a
+  stack.  The most recently freed buffer will be the first to be
+  given to the packet driver.  This behavior improves performance
+  on machines with caches.
+
+  When the packet driver needs a buffer it will perform a call to the
+  buffer management code.  The buffer management code should quickly
+  give the packet driver a buffer; you should not be printing debug
+  messages, using the heap, or anything else that might take a long time.
+  You are also possibly interrupting active user code so calling back
+  into the C runtime or DOS probably isn't safe either.  The packet
+  driver will then call a second time to let you know that the buffer
+  has been filled.
+
+  Buffers that have been filled are placed in a ring list so that they
+  are processed in the order in which they arrive.  The tail of the
+  ring list is updated by the packet driver when it calls us the
+  second time.  Only the receive code called by the packet driver should
+  update the tail of the ring list.
+
+  Buffers that are in use are managed by mTCP and application code.
+  It is the responsibility of that code to return all buffers after they
+  are used.  Buffers should be quickly processed and returned to avoid
+  the case where there are no free buffers to give the packet driver.
+  Copy what you need from the buffer and return it; once you give a
+  buffer back you have no idea how quickly it will be reused, and
+  a dangling pointer into a buffer is a coding error.
+
+  The buffer management code is careful to disable interrupts when
+  manipulating the free list.  This is necessary because you don't want
+  to have the packet driver try to take a buffer while you are maintaining
+  the free list.  That would cause a race condition that would corrupt
+  the free list.  This locking is effectively the only locking we need
+  to do in the entire protocol stack.
+
+
+Incoming packet processing
+
+  Incoming packets sit on a ring list.  The library processes the packets
+  one at a time in the order of arrival.  The library has to make a call
+  to do this, effectively making it a polling operation.  That polling
+  is done by the PACKET_PROCESS_SINGLE macro,
+
+  An alternative could be to drive protocol processing from the interrupt
+  where the packet is received.  This would require more locking, be
+  harder to debug, and significantly restrict what the mTCP protocol code
+  could do while under the interrupt.  The polling method used here
+  might cause unnecessary spinning while waiting for packets, but it
+  is simpler and more robust.
+
+  Packets are routed to the different protocol handlers depending on
+  their type.  The initial routing happens in "Packet_process_internal"
+  which is wrapped by the PACKET_PROCESS_SINGLE macro to cut down on
+  call overhead.
+
+
+Incoming UDP packet handling
+
+  UDP is a simple protocol that puts a lot of the burden on the end
+  application.
+
+  A user application is required to register to receive UDP traffic on
+  specific UDP ports.  The registration includes providing a callback
+  function that will be used when a UDP packet on the specified port
+  is received.
+
+  When a UDP packet is received it is put on the ring list.  When the
+  code calls PACKET_PROCESS_SINGLE the protocol code will first do basic
+  IP protocol checking and will route it to the UDP protocol code.
+  That code will then figure out if a user application is interested
+  in that UDP packet and call the user supplied callback function
+  if necessary.  The callback function should quickly copy what it
+  needs from the packet and return the packet to the free list.
+  The user application can then later check to see if it has new
+  data to work with and act accordingly.
+
+
+
+Incoming TCP packet handling
+
+  TCP is a much more complex protocol.  To receive data on a TCP
+  socket the socket must first be created and established by the
+  user application.
+
+  When a TCP packet is received it is put on the ring list.  When the
+  code calls PACKET_PROCESS_SINGLE the protocol code will first do basic
+  IP protocol checking and will route it to the TCP protocol code.
+  The TCP protocol code will then look for a socket connection that
+  matches the packet, or for a listening socket connection that can
+  match the packet.  If no matches are found the packet is rejected
+  and freed.
+
+  If a match is found the packet is processed in the context of the
+  socket that owns it.  The state of the socket determines how the
+  packet is handled.  Eventually the data (if any) is copied from
+  the packet, the state of the socket is updated, and the packet is
+  returned.
+
+  User code needs to poll its open sockets to look for state changes
+  and new data.  The recv method on a socket can be used to check
+  for new data.  Other socket methods allow a user to detect when
+  a socket has been closed.  Code that listens for new sockets needs
+  to periodically check for new sockets with the "accept" call.
+
+
+
+Outgoing UDP packet handling
+
+  UDP is a "best effort" delivery protocol.  Each packet is treated
+  as an individual entity without any state being shared between packets.
+  There is no loss detection or retry capability unless the user
+  application codes it.  This makes UDP light and fast.
+
+  Sending a UDP packet is easy.  The packet gets correctly formatted
+  at both the UDP and IP layer, and the packet driver is called to
+  send the packet.  After that, it is gone.  If it does not make it
+  the user application needs to timeout and try again.
+
+
+
+Outgoing TCP packet handling
+
+  Most end user applications will call "send" on an active socket
+  to send data.  This is all they need to know about.
+
+  Under the covers things are much more complex.  TCP pre-allocates
+  a pool of buffers that are used exclusively for sending TCP data.
+  The pool of buffers contains meta data for managing the sending
+  of the data, room for the protocol headers, and room for the end
+  user data.  The TCP protocol handler owns the buffers; end user
+  applications generally should not be aware of or manipulating these
+  buffers.
+
+  New data to send is first enqueued on a ring buffer called "outgoing."
+  These are packets that need to be sent down the wire at the next
+  opportunity.  The actual sending of these buffers is trigged by
+  a function called "Tcp::drivePackets."  Requiring an explicit call
+  to send the packets allows for multiple packets to be batched up for
+  sending, which is more efficient.
+
+  After packets are sent down the wire they need to be held in
+  a ring buffer called "sent" until their arrival is acknowledged
+  by the other side of the socket connection.  In the event that
+  a packet is lost a timeout timer will cause packets to be resent.
+  When a packet is finally acknowledged from the other side the
+  buffer can be recycled.
+
+
+
+IP Checksumming
+
+  The IP, TCP and UDP checksums are handled as part of the protocol
+  handling so there is nothing that a user needs to be aware of.
+  This code is notable because it is the only code written entirely
+  in assembler.
+
+  The checksum routines are extremely important for performance
+  and the nature of the code makes it hard for any C compiler to
+  effectively optimize it.  The main loop of the checksum routine
+  does map nicely to the hardware even though the hardware is
+  16 bit - the 'carry' bit makes all of the difference.
+
+  Loop unrolling is used to reduce the branching overhead
+  within the checksum routines.  In general you can count on the
+  IP headers to be at least 20 bytes long.  UDP headers are eight
+  bytes, and TCP headers are a minimum of twenty bytes.  All headers
+  grow in increments of four bytes.  The code takes these into account
+  so that the number of bytes in a header is a multiple of a number
+  of bytes in the loop iteration.
+
+
+Timer management
+
+  My early code used the C runtime to get the time of day at either
+  1 second of granularity using time() or at millisecond granularity
+  using gettime( ).  The granularity using gettime was effectively 55
+  ms, due to the way that BIOS keeps track of time.
+
+  Repeated calls to gettime were too expensive, and comparing the
+  timestamps was also very expensive.  This lead to a lot of wasted
+  time trying to determine if enough elapsed time had past.
+
+  A normal PC BIOS will setup a timer that ticks every 55 milliseconds.
+  The timer updates a counter in the BIOS area of RAM so one can
+  easily count timer ticks by looking at that counter.  The problem
+  with the counter is that it can rollover on you.  To prevent having
+  to worry about the rollover case mTCP hooks the timer interrupt
+  and keeps its own tick count.  That allows us to easily determine
+  elapsed time (by looking at the tick counter) without worrying about
+  the rollover case.
+
+
+
+Stack initialization and teardown
+
+  After your code has loaded and checked its parameters it will need
+  to start the mTCP stack.  The Utils::initStack( ) call is used to do
+  this.  Here is the sequence of steps that are performed:
+
+    - Initialize the data structures used to interface to the packet driver.
+    - Check for the existence of the packet driver.
+    - Register with the packet driver to accept all types of packets.
+    - Hook the BIOS timer interrupt.
+    - Initialize Arp, Ip, and Icmp, and TCP
+    - Initialize DNS
+    - Enable packet receiving by turning on the flow of buffers
+
+
+  If any of these steps fail initStack will clean up correctly.
+
+  If initStack completes you have two interesting problems to handle:
+
+    - The packet driver is calling mTCP for each new packet it receives
+    - The timer tick interrupt is causing some mTCP code to run
+
+  While not really problems, you need to be aware these things are
+  happening.  If your program terminates abnormally without unhooking
+  from the packet driver and the timer interrupt your machine will
+  crash.  You need to ensure that you always use Utils::endStack( )
+  while your program is ending to ensure that these things get
+  unhooked properly.
+
+  Most applications will hook Ctrl-Break and Ctrl-C to make sure that
+  the user doesn't break out of the application without having the
+  proper stack shutdown performed.

@@ -4,6 +4,7 @@ break off
 echo Loading setup...
 echo.
 cls
+cls
 SUSCR.EXE /D " Cobalt OS 1.0 Setup " /M "Press ENTER to continue."
 echo.
 echo  Cobalt is a new operating system based on FreeDOS, designed to be easy

@@ -1,0 +1,79 @@
+
+Debugging mTCP
+Michael Brutman, May 2011
+
+
+Tracing
+
+  Debugging communications code is challenging because things happen
+  asynchronously and timing can vary.  There is almost no code that
+  you can use a traditional debugger on.  To compensate mTCP has a
+  pretty robust tracing system.
+
+  The tracing system is compiled into all of the applications by default.
+  Although it is present in the code it is not turned on unless you
+  explicitly do something to turn it on.  Turning it on involves
+  setting environment variables.  The environment variables give you
+  some control over what gets traced.
+
+  To turn on tracing you need to set two environment variables:
+
+    set DEBUGGING=127
+    set LOGFILE=logfile.txt
+
+
+  The DEBUGGING variable sets the level of detail to trace and the
+  LOGFILE says where to dump the trace too.  Here are the useful
+  values for DEBUGGING that you can use:
+
+      1  Warnings only
+      3  Warnings and application messages
+    127  Full tracing except for packet contents
+    255  Full tracing with some packet contents
+
+  The bigger the number the slower the machine will get.  Traces
+  can also get quite large.  On slower machines tracing will cause
+  a noticable overhead because of the extra disk I/O.
+
+  The number is actually based on a bitmask, so if you want to be
+  selective you can turn on specific types of trace messages.  The
+  bit positions are:
+
+    0x01 Warnings
+    0x02 General - used by applications
+    0x04 ARP - used by ARP
+    0x08 IP  - used by the IP/ICMP layer
+    0x10 UDP - used by UDP
+    0x20 TCP - used by TCP
+    0x40 DNS - used by DNS
+    0x80 Packet dumping
+
+
+Packet tracing using Linux
+
+  If you can't figure out what is going on using a trace from within
+  the mTCP code the next step is to get a packet level trace from
+  outside of the machine.
+
+  If you are testing a protocol issue the easiest way to get a trace
+  is to use a Linux machine as the target of your test and to use
+  tcpdump on the Linux machine.  Tcpdump can be wrappered with GUI
+  tools to help you use it.
+
+  If you can not use the Linux machine directly as a target you can
+  set it up as a gateway and use Network Address Translation (NAT)
+  to have the traffic from your mTCP machine pass through the Linux
+  machine.  Network Address Translation can have some side effects
+  but this technique works well in most cases.  This requires you to
+  have two network cards on the Linux machine.
+
+  For the ultimate in packet tracing I have a Linux machine with
+  two Ethernet cards, and the kernel is setup to "bridge" traffic
+  across the two cards.  Normally my mTCP machine is connected
+  directly to the network like any other machine in the house,
+  but when I need to get a packet trace I will connect it to the
+  second network card on the Linux, configure the bridging, and
+  then take a trace.  The bridge mode is transparent to the machines
+  and the protocols allowing for a perfectly accurate trace of all
+  traffic going to and from the mTCP machine.
+

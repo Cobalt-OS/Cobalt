@@ -1,0 +1,220 @@
+Debugging mTCP Applications
+2013-04-26 Version
+Michael Brutman (mbbrutman@gmail.com)
+
+
+Introduction
+
+  Welcome to the wonderful world of DOS networking!  If you are reading
+  this you are either bored or you have a problem.  Hopefully this will
+  help you get past your problem.
+
+  Keep in mind there is a wide variety of hardware out there including
+  emulators on modern machines which are technically not even hardware!
+  This guide will give you some pointers on how to get past problems
+  but it is going to take some work.
+
+  This guide is broken up into two parts - [1] debugging hardware and
+  packet driver problems and [2] debugging mTCP problems.
+
+
+Hardware and packet driver problems
+
+  [Note: Some of this might not apply to PCI cards.  Parallel port
+  devices like the Xircom PE3 series require the parallel port to
+  be correctly configured.  Serial line users (SLIP or PPP) need to
+  ensure that their COM ports are setup correctly.  Do what makes
+  sense for your specific setup.]
+
+
+  mTCP will not work if your Ethernet card is not setup correctly.
+  Here is a partial list of things that can trip you up:
+
+  I/O ports
+
+    Like any PC hardware, your Ethernet card needs to be setup to use
+    I/O ports.  The I/O ports can not be shared with other cards, either
+    on purpose or by accident.  If there is a conflict with another card
+    you will get flakey operation or maybe even random crashes.
+
+    If your packet driver loads and reports the correct MAC address
+    for your Ethernet card you probably have the I/O port set
+    correctly.  (You might still have conflicts with other cards though.)
+    The MAC address can usually be found printed on a sticker on the card.
+
+
+  Hardware Interrupts (IRQ)
+
+    Your Ethernet card probably needs a hardware interrupt assigned to
+    it so that it can tell the packet driver when a new packet has
+    arrived on the wire.  The IRQ has to be set on the card so that it
+    is not shared with any other hardware in your system, including
+    devices that might be on your motherboard.
+
+    PC and XT class systems generally have very few interrupts available.
+    IRQ 0, 1, and 6 are usually always used or unavailable.  IRQ 2, 3,
+    4, 5, and 7 may be available depending on what else you have in
+    your system.
+
+    AT class systems have more choices for interrupts.  Unlike an XT
+    class system, IRQ 2 is not available on an AT class system.  
+
+
+  Shared Memory
+
+    All Ethernet cards use some memory to store incoming and outgoing
+    packets.  Simple Ethernet cards keep that memory on the card in
+    a private area that the rest of the computer can not see.  Better
+    cards expose this memory to the computer which improves performance
+    but requires you to find a memory range that does not conflict
+    with other cards or motherboard settings.
+
+    The NE1000 card is an example of a card that does not use shared
+    memory.  (The NE1000 just needs I/O ports and an IRQ.)  The Western
+    Digital 8003 series is an example of card that does required
+    shared memory.  It might need to show 8KB or 32KB (depending on the
+    card) to the system, requiring that much space free in your
+    memory map.
+
+    Cards that use shared memory will generally need space in the
+    area reserved for expansion cards which ranges from C000:0000 to
+    F000:0000.  Be sure to pick a range that does not conflict with
+    other devices.
+
+
+  If there is a conflict with another card on any of these settings
+  you will get flakey operation or maybe even random crashes.  Your
+  packet driver may be able to detect some errors, but don't
+  rely on that.
+
+
+
+  Cabling selection
+
+    Besides the basic resource allocation settings above there may be
+    other settings that you have to make on the card.  One good example
+    is setting the cable type - some cards make you set jumpers to choose
+    between the AUI port, Thinnet connector, or RJ45 connector.  If this
+    is set wrong the card will appear to work normally but will not be
+    able to send or receive data on the wire.
+
+
+  Bad cabling or network connection
+
+    Even with a properly configured card you can still encounter
+    problems.
+
+    Believe it or not, cables go bad.  If you suspect a cabling problem
+    find another cable that you know works and use that instead.
+    Cables are cheap so there is no reason to wrestle with a potentially
+    bad one.
+
+    Most Ethernet cards, hubs and switches have indicator lights that
+    tell you if a good connection has been made.  Examine your
+    indicator lights and ensure that your hardware thinks there is
+    a connection.  Use a known good port on your switch or hub if you
+    even get a hint of a problem with the port you are using.
+
+    Some cable modems are configured to only hand out a limited number
+    of addresses and will refuse to hand out more.  You may need to
+    reset the cable modem to clear its list of clients.  Switches and
+    hubs are generally reliable but sometimes cycling the power (turning
+    them off then on) clears up problems.
+
+    Older Ethernet cards pose special challenges.  Before modern
+    Ethernet standardized on CAT 5 cabling there was ThickNet and
+    ThinNet cabling.  ThickNet (the original Ethernet) was often supported
+    by using the AUI port on a card with an external transceiver, while
+    ThinNet was often directly connected to the card.  The card would have
+    to be configured to use one port or the other port and choosing the
+    wrong port will make it look like you have bad cabling.
+
+    Even on cards that look like they support twisted pair wiring (CAT5)
+    the signalling might not be correct, and thus not work on modern
+    switches and hubs.  For example older WD8003 series cards have both
+    an AUI port for an external transceiver and an RJ45 jack which accepts
+    a CAT5 cable, but it actually uses Lattisnet which is not compatible
+    with Ethernet signalling.  It is close enough to make a hub or switch
+    light up the port, but not close enough to enable data transfer.
+
+
+  Packet driver
+
+    First, ensure you have the right packet driver for your card!
+    Packet drivers are very specific to models of Ethernet cards.  I
+    always try to look for the packet driver from the manufacturer
+    that was shipped with the card.  If I can't find that I might use
+    a packet driver from a card in the same chipset family.
+
+    A good source for packet drivers for older cards is the Crynwr
+    packet driver collection at http://www.crynwr.com/ .  Those guys
+    defined the packet driver specification and did a lot of the
+    early work to make packet drivers available for ISA cards.  Source
+    code for their work is available, which is an added bonus.
+
+    If your Ethernet card is setup correctly you should know the I/O
+    port and other settings to pass to the packet driver on the command
+    line.  Packet drivers can detect some configuration problems or
+    mismatches but not all of them, so be sure you have the settings
+    that match your card.
+
+
+mTCP problems
+
+  I would rather have you believe that mTCP is perfect, but we know
+  that nothing ever is.  But we can strive ...
+
+  In general, the mTCP code is too complex for a casual user to try
+  to debug.  If I really do have a problem in the code we are going
+  to need to take a trace so that I can see what is going wrong.
+
+  Even if mTCP is acting normally you might still be having problems
+  related to your network or setup.  To make debugging and fixing
+  problems easier I have included some tracing features in the
+  library.
+
+  To turn on tracing you need to set two environment variables:
+
+    set DEBUGGING=127
+    set LOGFILE=logfile.txt
+
+
+  The DEBUGGING variable sets the level of detail to trace and the
+  LOGFILE says where to dump the trace too.  Here are the useful
+  values for DEBUGGING that you can use:
+
+      1  Warnings only
+      3  Warnings and application messages
+    127  Full tracing except for packet contents
+    255  Full tracing with some packet contents
+
+  The bigger the number the slower the machine will get.  Traces
+  can also get quite large.  On slower machines tracing will cause
+  a noticable overhead because of the extra disk I/O.
+
+  The number is actually based on a bitmask, so if you want to be
+  selective you can turn on specific types of trace messages.  The
+  bit positions are:
+
+    0x01 Warnings
+    0x02 General - used by applications
+    0x04 ARP - used by ARP
+    0x08 IP  - used by the IP/ICMP layer
+    0x10 UDP - used by UDP
+    0x20 TCP - used by TCP
+    0x40 DNS - used by DNS
+    0x80 Packet dumping
+
+
+  If you have a trace that you would like me to read send it along
+  with a brief explanation of what you were doing and what your
+  network setup looks like.  I have been able to help a few people
+  get up and running this way and I have fixed countless of my own
+  bugs with it.
+
+
+More information: http://www.brutman.com/mTCP
+
+
+Created April 26th, 2009, Last updated April 26th, 2013
+(C)opyright Michael B. Brutman, mbbrutman@gmail.com
