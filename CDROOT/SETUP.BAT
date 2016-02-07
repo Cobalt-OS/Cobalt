@@ -141,7 +141,7 @@ echo  You can optionally install a graphical file manager, called
 echo  FreeDOS Shell, so you don't have to use the command line at
 echo  all.
 echo.
-echo  Press Y to begin the install, or N to cancel.
+echo  Press Y to begin the install, or N to skip this step.
 echo.
 CHOICE.EXE > nul
 if errorlevel 2 goto complete

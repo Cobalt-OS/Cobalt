@@ -1,0 +1,14 @@
+Begin3
+Title: cdrcache
+Version: 2004-05-13
+Entered-date: 2003-10-08
+Description:    CD-ROM cache, caches reads for one drive, XMS, 386 or better
+Keywords: cache, freedos, smartdrv, cd-rom
+Author: Eric Auer <eric (at) coli.uni-sb.de>
+Maintained-by: Eric Auer <eric (at) coli.uni-sb.de>
+Primary-site: http://www.coli.uni-sb.de/~eric/stuff/soft/
+Alternate-site: ftp://ftp.ibiblio.org/pub/micro/pc-stuff/freedos/files/util/system/
+Platform: DOS (nasm assembler)
+Copying-policy: GPL2
+End
+

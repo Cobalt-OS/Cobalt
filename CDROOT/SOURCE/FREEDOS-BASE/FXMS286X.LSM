@@ -1,0 +1,14 @@
+Begin3
+Title:          fdxms286
+Version:        0.03.Temperaments
+Entered-date:   2005-05-28
+Description:    Replacement XMS driver for '286 systems or better.
+Keywords:       freedos, xms, himem
+Author:         Till Gerken <till@tantalo.net>, Martin Str”mberg <ams@ludd.ltu.se>
+Maintained-by:  Martin Str”mberg <ams@ludd.ltu.se>
+Primary-site:   http://www.ludd.ltu.se/~ams/freedos/
+Alternate-site: http://www.ibiblio.org/pub/micro/pc-stuff/freedos/files/dos/fdxms/286/
+Original-site:  http://www.ludd.ltu.se/~ams/freedos/
+Platforms:      dos (ASM)
+Copying-policy: GPL
+End
