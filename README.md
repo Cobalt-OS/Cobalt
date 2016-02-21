@@ -31,6 +31,7 @@ There are two main packages in the installer. The first, `BASE.ZIP`, contains th
 
 __New in Cobalt 1.1:__
 * Most FreeDOS commands and programs are now available in Cobalt
+* Added support for upgrading from MS-DOS, FreeDOS, and other DOS-based operating systems
 * Switched LFN driver to FreeDOS DOSLFN
 
 __New in Cobalt 1.0:__
