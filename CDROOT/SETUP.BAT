@@ -11,17 +11,12 @@ echo  Cobalt is a new operating system based on FreeDOS, designed to be easy
 echo  to use. Unlike FreeDOS, Cobalt is designed for users with no previous
 echo  DOS experience.
 echo.
-echo  Cobalt is still in development, so you might encounter bugs. Cobalt
-echo  currently includes:
+echo  Cobalt is still in development, so you might encounter bugs. Please report
+echo  bugs to https://github.com/corbindavenport/cobalt/issues.
 echo.
-echo  * 4DOS 8.00 command line
-echo  * FAT12/16/32 file system support
-echo  * Optional graphical file manager
-echo  * Silent boot
-echo  * Support for CD/DVD drives without configuration
-echo  * Support for Win95 long file names
-echo.
-echo  This setup will install Cobalt to your computer's internal drive.
+echo  This setup will install Cobalt to your computer's internal drive. If you
+echo  have a compatible OS previously installed, you will be able to upgrade
+echo  and keep all your files.
 pause >nul
 SUSCR.EXE /M "Setup is checking partitions on your hard drives..."
 GDISK.EXE 1|FIND.EXE "No partitions defined" > nul
@@ -35,8 +30,7 @@ goto chkact
 :invdc
 SUSCR.EXE /D " Cobalt OS 1.1 Setup " /M "Do you want format the hard drive?" /F "Y/N?"
 echo.
-echo  The main drive is not formatted. Do you wish to use it
-echo  with Cobalt?
+echo  The main drive is not formatted. Do you wish to use it with Cobalt?
 echo.
 echo  WARNING: This will erase all data. Make sure to backup all
 echo  important data before formatting.
@@ -65,8 +59,7 @@ goto loop
 :nofmtdc
 SUSCR.EXE /D " Cobalt OS 1.1 Setup " /M "Do you want to use the primary partition with Cobalt?" /F "Y/N?"
 echo.
-echo  The primary partition is not formatted. Do you wish to use it
-echo  with Cobalt?
+echo  The primary partition is not formatted. Do you wish to use it with Cobalt?
 echo.
 CHOICE.EXE > nul
 if errorlevel 2 goto cancel
@@ -96,23 +89,20 @@ echo  NOT overwrite the MBR. If you have no idea what an MBR or GRUB is,
 echo  just choose yes.
 echo.
 CHOICE.EXE > nul
-if errorlevel 2 goto cancel
+if errorlevel 2 goto mbrconfirm
 if not errorlevel 2 goto oscheck
 
-:oscheck
+:mbrconfirm
+SUSCR.EXE /D " Cobalt OS 1.1 Setup " /M "Rewriting the MBR..."
 GDISK.EXE 1 /mbr > nul
-if exist C:\COMMAND.COM (
-    goto upgradedos
-)
-if exist C:\MSDOS.SYS (
-    goto upgradedos
-)
-if exist C:\KERNEL.SYS (
-    goto upgradedos
-)
-if exist C:\SYSTEM\4DOS\4DOS.INI (
-    goto upgradecobalt
-)
+goto oscheck
+
+:oscheck
+SUSCR.EXE /D " Cobalt OS 1.1 Setup " /M "Checking for installed operating systems..."
+if exist C:\SYSTEM\4DOS\4DOS.INI goto upgradecobalt
+if exist C:\COMMAND.COM goto upgradedos
+if exist C:\MSDOS.SYS goto upgradedos
+if exist C:\KERNEL.SYS goto upgradedos
 goto freshinstall
 
 :upgradecobalt
