@@ -35,7 +35,7 @@ goto chkact
 :invdc
 SUSCR.EXE /D " Cobalt OS 1.1 Setup " /M "Do you want format the hard drive?" /F "Y/N?"
 echo.
-echo  The main hard drisk is not formatted. Do you wish to use it
+echo  The main drive is not formatted. Do you wish to use it
 echo  with Cobalt?
 echo.
 echo  WARNING: This will erase all data. Make sure to backup all
@@ -97,21 +97,117 @@ echo  just choose yes.
 echo.
 CHOICE.EXE > nul
 if errorlevel 2 goto cancel
-if not errorlevel 2 goto ready
+if not errorlevel 2 goto oscheck
 
-:ready
+:oscheck
 GDISK.EXE 1 /mbr > nul
+if exist C:\COMMAND.COM (
+    goto upgradedos
+)
+if exist C:\MSDOS.SYS (
+    goto upgradedos
+)
+if exist C:\KERNEL.SYS (
+    goto upgradedos
+)
+if exist C:\SYSTEM\4DOS\4DOS.INI (
+    goto upgradecobalt
+)
+goto freshinstall
+
+:upgradecobalt
 SUSCR.EXE /D " Cobalt OS 1.1 Setup " /M "Install Cobalt to the C: drive?" /F "Y/N?"
 echo.
-echo  Cobalt is now ready to install to the C: drive.
+echo  This installer has detected a previous installation of Cobalt
+echo  on this drive. It will be upgraded to the current installation.
+echo.
+echo  The previous SYSTEM folder will be deleted and replaced with
+echo  the Cobalt 1.1 system folder.
 echo.
 echo  Press Y to begin the install, or N to cancel.
 echo.
 CHOICE.EXE > nul
 if errorlevel 2 goto cancel
-if not errorlevel 2 goto install
+echo [ STARTING SYSTEM UPGRADE ] > c:\log.txt
+echo . > c:\log.txt
+SUSCR.EXE /D " Cobalt OS 1.1 Setup " /M "Deleting previous Cobalt installation..."
+DELTREE.EXE /Y C:\SYSTEM > c:\log.txt
+echo [ REWRITING DOS SYSTEM ] > c:\log.txt
+SUSCR.EXE /D " Cobalt OS 1.1 Setup " /M "Installing base DOS system to C:"
+SYS.COM A: C: > c:\log.txt
+SUSCR.EXE /D " Cobalt OS 1.1 Setup " /M "Copying base system files to C:"
+if not errorlevel 0 goto error
+del c:\COMMAND.COM
+if not errorlevel 0 goto error
+attrib +h c:\kernel.sys
+if not errorlevel 0 goto error
+attrib +h c:\config.sys
+if not errorlevel 0 goto error
+SUSCR.EXE /D " Cobalt OS 1.1 Setup " /M "Decompressing BASE.ZIP to C:"
+UNZIP.exe -u -o BASE.ZIP -d c:\ > c:\log.txt
+if not errorlevel 0 goto error
+SUSCR.EXE /D " Cobalt OS 1.1 Setup " /M "Saving log file on C:\SYSTEM\LOG.TXT..."
+echo [ ENDED SYSTEM UPGRADE ] > c:\log.txt
+copy c:\log.txt C:\SYSTEM\LOG.TXT
+if not errorlevel 0 goto error
+del c:\log.txt
+if not errorlevel 0 goto error
+goto askdesktop
 
-:install
+:upgradedos
+SUSCR.EXE /D " Cobalt OS 1.1 Setup " /M "Install Cobalt to the C: drive?" /F "Y/N?"
+echo.
+echo  This installer has detected a previous installation of a
+echo  DOS-based operating system, such as FreeDOS or MS-DOS.
+echo.
+echo  Cobalt will move the current AUTOEXEC.BAT and CONFIG.SYS
+echo  files to AUTOEXEC.OLD and CONFIG.OLD, respectively. No
+echo  other files will be modified.
+echo.
+echo  Press Y to begin the install, or N to cancel.
+echo.
+CHOICE.EXE > nul
+if errorlevel 2 goto cancel
+SUSCR.EXE /D " Cobalt OS 1.1 Setup " /M "Renaming existing DOS files"
+echo [ RENAMING FILES ] > c:\log.txt
+COPY C:\CONFIG.SYS C:\CONFIG.OLD > c:\log.txt
+COPY C:\AUTOEXEC.BAT C:\AUTOEXEC.OLD > c:\log.txt
+DEL C:\CONFIG.SYS > c:\log.txt
+DEL C:\AUTOEXEC.BAT > c:\log.txt
+echo [ REWRITING DOS SYSTEM ] > c:\log.txt
+SUSCR.EXE /D " Cobalt OS 1.1 Setup " /M "Installing base DOS system to C:"
+SYS.COM A: C: > c:\log.txt
+echo [ STARTING SYSTEM INSTALLATION ] > c:\log.txt
+echo . > c:\log.txt
+SUSCR.EXE /D " Cobalt OS 1.1 Setup " /M "Copying base system files to C:"
+if not errorlevel 0 goto error
+del c:\COMMAND.COM
+if not errorlevel 0 goto error
+attrib +h c:\kernel.sys
+if not errorlevel 0 goto error
+attrib +h c:\config.sys
+if not errorlevel 0 goto error
+SUSCR.EXE /D " Cobalt OS 1.1 Setup " /M "Decompressing BASE.ZIP to C:"
+UNZIP.exe -u -o BASE.ZIP -d c:\ > c:\log.txt
+if not errorlevel 0 goto error
+SUSCR.EXE /D " Cobalt OS 1.1 Setup " /M "Saving log file on C:\SYSTEM\LOG.TXT..."
+echo [ ENDED SYSTEM INSTALLATION ] > c:\log.txt
+copy c:\log.txt C:\SYSTEM\LOG.TXT
+if not errorlevel 0 goto error
+del c:\log.txt
+if not errorlevel 0 goto error
+goto askdesktop
+
+:freshinstall
+SUSCR.EXE /D " Cobalt OS 1.1 Setup " /M "Install Cobalt to the C: drive?" /F "Y/N?"
+echo.
+echo  Cobalt is now ready to install to the C: drive.
+echo  THIS WILL DELETE ALL FILES ON THE C: DRIVE.
+echo.
+echo  Press Y to begin the install, or N to cancel.
+echo.
+CHOICE.EXE > nul
+if errorlevel 2 goto cancel
 echo [ STARTING SYSTEM INSTALLATION ] > c:\log.txt
 echo . > c:\log.txt
 SUSCR.EXE /D " Cobalt OS 1.1 Setup " /M "Copying base system files to C:"
