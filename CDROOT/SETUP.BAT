@@ -208,6 +208,7 @@ if not errorlevel 2 goto installdesktop
 
 :installdesktop
 SUSCR.EXE /D " Cobalt OS 1.2 Setup " /M "Decompressing DESKTOP.ZIP to C:"
+UNZIP.exe -u -o DESKTOP.ZIP -d c:\
 if not errorlevel 0 goto error
 goto complete
 
