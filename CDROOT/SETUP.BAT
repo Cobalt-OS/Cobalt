@@ -120,19 +120,12 @@ CHOICE.EXE > nul
 if errorlevel 2 goto cancel
 SUSCR.EXE /D " Cobalt OS 1.2 Setup " /M "Deleting previous Cobalt installation..."
 DELTREE.COM /Y /Z:SERIOUSLY C:\SYSTEM
-SUSCR.EXE /D " Cobalt OS 1.2 Setup " /M "Installing base DOS system to C:"
+SUSCR.EXE /D " Cobalt OS 1.2 Setup " /M "Installing base DOS system..."
 SYS.COM A: C:
-SUSCR.EXE /D " Cobalt OS 1.2 Setup " /M "Copying base system files to C:"
-if not errorlevel 0 goto error
-del c:\COMMAND.COM
-if not errorlevel 0 goto error
-attrib +h c:\kernel.sys
-if not errorlevel 0 goto error
-attrib +h c:\config.sys
-if not errorlevel 0 goto error
-SUSCR.EXE /D " Cobalt OS 1.2 Setup " /M "Decompressing BASE.ZIP to C:"
+SUSCR.EXE /D " Cobalt OS 1.2 Setup " /M "Decompressing BASE.ZIP..."
 UNZIP.exe -u -o BASE.ZIP -d c:\
 if not errorlevel 0 goto error
+del c:\COMMAND.COM
 goto askdesktop
 
 :upgradedos
@@ -149,28 +142,21 @@ echo  Press Y to begin the install, or N to cancel.
 echo.
 CHOICE.EXE > nul
 if errorlevel 2 goto cancel
-SUSCR.EXE /D " Cobalt OS 1.2 Setup " /M "Renaming existing DOS files"
+SUSCR.EXE /D " Cobalt OS 1.2 Setup " /M "Renaming existing DOS files..."
 COPY C:\CONFIG.SYS C:\CONFIG.OLD
 COPY C:\AUTOEXEC.BAT C:\AUTOEXEC.OLD
 DEL C:\CONFIG.SYS
 DEL C:\AUTOEXEC.BAT
-SUSCR.EXE /D " Cobalt OS 1.2 Setup " /M "Installing base DOS system to C:"
+SUSCR.EXE /D " Cobalt OS 1.2 Setup " /M "Installing base DOS system..."
 SYS.COM A: C:
-SUSCR.EXE /D " Cobalt OS 1.2 Setup " /M "Copying base system files to C:"
-if not errorlevel 0 goto error
-del c:\COMMAND.COM
-if not errorlevel 0 goto error
-attrib +h c:\kernel.sys
-if not errorlevel 0 goto error
-attrib +h c:\config.sys
-if not errorlevel 0 goto error
-SUSCR.EXE /D " Cobalt OS 1.2 Setup " /M "Decompressing BASE.ZIP to C:"
+SUSCR.EXE /D " Cobalt OS 1.2 Setup " /M "Decompressing BASE.ZIP..."
 UNZIP.exe -u -o BASE.ZIP -d c:\
 if not errorlevel 0 goto error
+del c:\COMMAND.COM
 goto askdesktop
 
 :freshinstall
-SUSCR.EXE /D " Cobalt OS 1.2 Setup " /M "Install Cobalt to the C: drive?" /F "Y/N?"
+SUSCR.EXE /D " Cobalt OS 1.2 Setup " /M "Install Cobalt to the drive?" /F "Y/N?"
 echo.
 echo  Cobalt is now ready to install to the C: drive.
 echo  THIS WILL DELETE ALL FILES ON THE C: DRIVE.
@@ -179,18 +165,13 @@ echo  Press Y to begin the install, or N to cancel.
 echo.
 CHOICE.EXE > nul
 if errorlevel 2 goto cancel
-SUSCR.EXE /D " Cobalt OS 1.2 Setup " /M "Copying base system files to C:"
+SUSCR.EXE /D " Cobalt OS 1.2 Setup " /M "Copying base system files..."
 FORMAT.EXE c: /z:seriously /v:COBALT /s /y
 if not errorlevel 0 goto error
-del c:\COMMAND.COM
-if not errorlevel 0 goto error
-attrib +h c:\kernel.sys
-if not errorlevel 0 goto error
-attrib +h c:\config.sys
-if not errorlevel 0 goto error
-SUSCR.EXE /D " Cobalt OS 1.2 Setup " /M "Decompressing BASE.ZIP to C:"
+SUSCR.EXE /D " Cobalt OS 1.2 Setup " /M "Decompressing BASE.ZIP..."
 UNZIP.exe -u -o BASE.ZIP -d c:\
 if not errorlevel 0 goto error
+del c:\COMMAND.COM
 goto askdesktop
 
 :askdesktop
@@ -200,20 +181,20 @@ echo  You can optionally install a graphical file manager, called
 echo  FreeDOS Shell, so you don't have to use the command line at
 echo  all.
 echo.
-echo  Press Y to begin the install, or N to skip this step.
+echo  Press Y to install the desktop, or N to skip this step.
 echo.
 CHOICE.EXE > nul
 if errorlevel 2 goto complete
 if not errorlevel 2 goto installdesktop
 
 :installdesktop
-SUSCR.EXE /D " Cobalt OS 1.2 Setup " /M "Decompressing DESKTOP.ZIP to C:"
+SUSCR.EXE /D " Cobalt OS 1.2 Setup " /M "Decompressing DESKTOP.ZIP..."
 UNZIP.exe -u -o DESKTOP.ZIP -d c:\
 if not errorlevel 0 goto error
 goto complete
 
 :complete
-SUSCR.EXE /D " Cobalt OS 1.2 Setup " /M "Finished installation to C:"
+SUSCR.EXE /D " Cobalt OS 1.2 Setup " /M "Finished installation."
 echo.
 echo  Congratulations, Cobalt has been installed to your computer's hard
 echo  drive! Please eject the install disc and reboot your computer.
