@@ -4,7 +4,27 @@ break off
 echo Loading setup...
 echo.
 cls
-cls
+SUSCR.EXE /D " Cobalt OS 1.2 Setup " /M "Detecting system..."
+RBPCI\PCICFG.EXE -t *|FIND.EXE "DeviceID BEEF" > nul
+if not errorlevel 1 goto virtualbox
+goto setup
+
+:virtualbox
+SUSCR.EXE /D " Cobalt OS 1.2 Setup " /M "Press ENTER to continue."
+echo.
+echo  You are installing Cobalt inside VirtualBox. In order for Cobalt to work
+echo  correctly, please make sure VT-x/AMD-V is turned off for the Cobalt
+echo  virtual machine.
+echo.
+echo  To do this, select the Cobalt VM on the main VirtualBox window,
+echo  and click the Settings icon. Then click 'System' on the left
+echo  panel, click the 'Acceleration' tab, and uncheck the box for
+echo  'Enable VT-x/AMD-V'. You will need to turn off the virtual machine
+echo  to do this.
+echo.
+pause >nul
+
+:setup
 SUSCR.EXE /D " Cobalt OS 1.2 Setup " /M "Press ENTER to continue."
 echo.
 echo  Cobalt is a new operating system based on FreeDOS, designed to be easy
@@ -15,8 +35,9 @@ echo  Cobalt is still in development, so you might encounter bugs. Please report
 echo  bugs to https://github.com/corbindavenport/cobalt/issues.
 echo.
 echo  This setup will install Cobalt to your computer's internal drive. If you
-echo  have a compatible OS previously installed, you will be able to upgrade
-echo  and keep all your files.
+echo  already have FreeDOS, MS-DOS, etc on your computer already, you will be
+echo  able to upgrade to Cobalt.
+echo.
 pause >nul
 SUSCR.EXE /M "Setup is checking partitions on your hard drives..."
 GDISK.EXE 1|FIND.EXE "No partitions defined" > nul
