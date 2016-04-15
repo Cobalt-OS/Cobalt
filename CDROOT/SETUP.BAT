@@ -184,13 +184,23 @@ echo.
 echo  Press Y to install the desktop, or N to skip this step.
 echo.
 CHOICE.EXE > nul
-if errorlevel 2 goto complete
+if errorlevel 2 goto createrestore
 if not errorlevel 2 goto installdesktop
 
 :installdesktop
 SUSCR.EXE /D " Cobalt OS 1.2 Setup " /M "Decompressing DESKTOP.ZIP..."
 UNZIP.exe -u -o DESKTOP.ZIP -d c:\
 if not errorlevel 0 goto error
+goto createrestore
+
+:createrestore
+SUSCR.EXE /D " Cobalt OS 1.2 Setup " /M "Creating restore point..."
+echo.
+echo  Please wait while the installer creates a restore point.
+echo.
+mkdir C:\SYSTEM\RESTORE\
+copy BASE.ZIP C:\SYSTEM\RESTORE\BASE.ZIP
+if exist C:\SYSTEM\DOSSHELL.EXE copy DESKTOP.ZIP C:\SYSTEM\RESTORE\DESKTOP.ZIP
 goto complete
 
 :complete
