@@ -222,6 +222,12 @@ echo.
 mkdir C:\SYSTEM\RESTORE\
 copy BASE.ZIP C:\SYSTEM\RESTORE\BASE.ZIP
 if exist C:\SYSTEM\DOSSHELL.EXE copy DESKTOP.ZIP C:\SYSTEM\RESTORE\DESKTOP.ZIP
+RBPCI\PCICFG.EXE -t *|FIND.EXE "DeviceID BEEF" > nul
+if not errorlevel 1 goto vboxtxt
+goto complete
+
+:vboxtxt
+echo A > C:\SYSTEM\VBOX.TXT
 goto complete
 
 :complete
