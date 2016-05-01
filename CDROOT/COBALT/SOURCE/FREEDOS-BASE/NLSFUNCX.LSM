@@ -1,0 +1,15 @@
+Begin3
+Title:          NLSFUNC.EXE
+Version:        0.4
+Entered-date:   2006-08-22
+Description:    NLSFUNC adds NLS (National Language Support) functionality
+Keywords:       freedos, nls, country, display, mode
+Author:         Eduardo Casino-Almao <casino_e@terra.es>
+Maintained-by:  Eduardo Casino-Almao <casino_e@terra.es>
+Primary-site:   http://www.ibiblio.org/pub/micro/pc-stuff/freedos/files/dos/nlsfunc/nlsfn04x.zip
+ http://www.ibiblio.org/pub/micro/pc-stuff/freedos/files/dos/nlsfunc/nlsfn04s.zip
+Original-site:  http://perso.wanadoo.es/babelfish/nlsfunc/nlsfn04x.zip
+ http://perso.wanadoo.es/babelfish/nlsfunc/nlsfn04s.zip
+Platforms:      DOS (nasm)
+Copying-policy: GPL
+End

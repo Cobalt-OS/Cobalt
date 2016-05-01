@@ -1,0 +1,13 @@
+Begin3
+Title:          FreeCom
+Version:        0.84pre2
+Entered-date:   August 10 2006 06:54:37
+Description:    The FreeDOS Command Shell
+Keywords:       freecom freedos command shell
+Author:         fd-freecom@topica.com (developers)
+Maintained-by:  Blairdude@remove.this.gmail.com (maintainers)
+Primary-site:   http://freedos.sourceforge.net/
+Alternate-site: http://www.freedos.org/
+Platforms:      dos dosemu
+Copying-policy: GPL
+End

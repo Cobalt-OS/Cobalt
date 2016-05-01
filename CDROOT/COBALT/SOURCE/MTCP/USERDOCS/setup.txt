@@ -1,0 +1,599 @@
+Configuring mTCP Applications
+2013-04-26 Version
+Michael Brutman (mbbrutman@gmail.com)
+
+Home page: http://www.brutman.com/mTCP
+
+
+Contents
+
+  Introduction
+  General Requirements
+  Pre-requisites
+  Loading the packet driver
+  Creating the configuration file
+  Setting the MTCPCFG environment variable
+  Running the DHCP Client
+  Configuring by Hand (Static addresses)
+  List of networking related parameters
+  Other configuration parameters in the configuration file
+  More on the MTU setting
+  SLIP and PPP users
+  How the configuration file works
+
+
+Introduction
+
+  mTCP is a library that implements ARP, IP, UDP, TCP, DNS resolving
+  and a few other useful features.  Applications that use the mTCP
+  library have common configuration requirements, mostly related to
+  setting up TCP/IP addresses and telling the mTCP library code how
+  to talk to the packet driver for your Ethernet card.  This
+  document explains how to setup the basic parameters for applications
+  that use mTCP.  Each individual application (like IRCjr) may have
+  some additional setup that needs to be done.
+
+
+General requirements
+
+  PC compatible machine (including the PCjr and most 'near' clones)
+  8088 processor or better
+  128 to 256KB RAM (depends on the application)
+  Display: CGA, EGA, VGA or MDA
+  Supported Ethernet card with packet driver or SLIP/PPP connection
+  DOS 2.1 or newer (DOS 3.3 or newer recommended)
+
+
+Pre-requisites
+
+  Your Ethernet hardware has to be installed and you should know
+  what IRQ and port settings you have configured on the card.
+
+
+Loading the packet driver
+
+  Note: SLIP and PPP users, please see the separate section for usage
+  notes specfic to SLIP and PPP.
+
+  mTCP does almost everything except talk to your Ethernet card.  There
+  are a lot of Ethernet cards out there and they all use different
+  hardware and look different at the hardware level.  To make mTCP able
+  to use a wide variety of Ethernet cards a piece of code called a 'packet
+  driver' gets loaded first.  Each Ethernet card comes with a packet driver
+  designed for that specific Ethernet card and that packet driver is
+  responsible for making the Ethernet card look like a standard device.
+  mTCP talks to the packet driver in a generic way while the packet
+  driver converts the requests to something meaningful for your Ethernet
+  card.  That keeps mTCP from having to know the details of every Ethernet
+  card out there - it just has to know how to talk to packet drivers.
+
+  You have to have the correct packet driver for your Ethernet card. A
+  lot of packet drivers can be found at http://www.crynwr.com/drivers/.
+  That site covers most of the classic cards like the 3Com 3C503, the
+  NE1000, the Western Digital/SMC 8xx3 series, etc.  If you have a newer
+  card on the PCI bus you can try the manufacturer's web site, or look
+  for the CD-ROM that came with the card - the packet driver will be in
+  the DOS software directory.  A lot of PCI cards have packet drivers, but
+  I imagine that as DOS becomes a distant memory that will be less likely.
+
+  The parameters on the packet drivers will vary but one that you will
+  always have to provide is the software interrupt number that the packet
+  driver is going to take control of.  The software interrupt number is the
+  address of the 'service' that the packet driver is going to provide to
+  mTCP applications, and that service is the ability to send and receive
+  packets on the Ethernet hardware.
+
+  Note that the software interrupt number has nothing to do with the
+  configuration of the Ethernet hardware. The software interrupt number
+  is assigned by you and you are telling the packet driver which software
+  interrupt to use. Software interrupt numbers are usually in the range
+  of 0x60 (hex) to 0x66 (hex). You need to pick one that is not in use
+  already but since most DOS software does not these software interrupts
+  0x60 is usually available. This is in contrast to hardware interrupt
+  numbers, which is what the Ethernet card uses to signal to the computer
+  that new packets have arrived. Hardware interrupts are set on the card
+  using jumpers or by configuration software that comes with the card.
+
+  Here is an example showing an NE2000 clone card being loaded using the
+  default I/O ports and IRQ3 . It is also being told to use software
+  interrupt 0x60:
+
+    ne2000 0x60 3
+
+  Here is another example featuring an older Western Digital 8003 card:
+
+    smc_wd 0x60 0x03 0x280 0xD000
+
+  In this example the software interrupt to use is 0x60, the IRQ is 3,
+  the I/O  ports start at 0x280, and the shared memory address for the
+  RAM on the card is  going to be located at 0xD000:0000 in memory.
+
+  For a general discussion on packet drivers see the DOS Packet Drivers
+  page (http://www.brutman.com/Dos_Networking/packet_drivers.html).
+
+
+
+Creating the configuration file
+
+  Next it is time to create the configuration file. You generally have
+  to do this just once.
+
+  mTCP requires a configuration file to tell it things like the IP
+  address to use, where the nameservers are, etc. There are two ways
+  to create this configuration file:
+
+    * DHCP Configuration: DHCP is a network protocol that allows a
+      machine to find out what its IP address, netmask, and other
+      parameters are automatically.  If you have a cable modem,
+      DSL modem, or router on your network that assigns addresses
+      to machines automatically then you can use this method.
+    * Setup the machine by hand.  You will provide a set of required
+      IP addresses that describe your network.  This is recommended
+      for advanced users who understand their network.
+
+  If you are going to use DHCP you can get by with just two lines
+  in the configuration file. One line tells mTCP which software
+  interrupt to use to talk to the packet driver. The other assigns
+  a hostname to your machine. Here is an example of a minimum
+  configuration file for mTCP:
+
+    PACKETINT 0x60
+    HOSTNAME PCjr
+
+  Just create a file with these lines, substitute in the correct software
+  interrupt value and hostname for your machine, and you can move onto
+  the next step. (The PACKETINT parameter here needs to be set to whatever
+  software interrupt you told the packet driver to use. Hostname can be
+  whatever you like, but don't make it too long or use punctuation.)
+
+  If you are going to use static configuration you have a little more
+  work. Here are the lines you need to add and fill in correctly:
+
+    PACKETINT 0x60
+    IPADDR 192.168.2.6
+    NETMASK 255.255.255.0
+    GATEWAY 192.168.2.1
+    NAMESERVER 68.115.71.53
+    MTU 1500
+    HOSTNAME PCjr
+
+  And of course, fill in the correct values for your network.
+
+  All of the mTCP programs read the configuration file each time they
+  start.  Besides holding network parameters the configuration file
+  can hold configuration settings for the applications. Those additional
+  settings are documented by each application.
+
+
+
+Setting the MTCPCFG environment variable
+
+  Next you need to set an environment variable to point to the
+  configuration file.  All of the mTCP code looks for the environment
+  variable first - if it doesn't find it, it doesn't run.  If the
+  environment variable is set correctly then the mTCP code will be
+  able to find the configuration file.
+
+    set MTCPCFG=c:\packet\tcp.cfg
+
+  That's it!  You can put this in AUTOEXEC.BAT or another batch file
+  that you run before you start using mTCP. Be sure to put the location
+  of your file in place of "c:\packet\tcp.cfg". I suggest using a full
+  path name starting with a drive letter (as shown above) so that mTCP
+  can always find the file. Another good idea is to place the mTCP
+  programs on your PATH so that you can find the mTCP programs no matter
+  what subdirectory or drive you are in.
+
+
+
+Running the DHCP Client
+
+  If you are using a 'static' configuration, skip this section.
+
+  If you have the packet driver loaded and the MTCPCFG environment
+  variable pointing at a good configuration file you are ready to run
+  DHCP.  DHCP is really simple to run - just type dhcp and go! If your
+  setup is correct and it makes contact with a DHCP server on the
+  network it will get an IP address and other settings and write them
+  to the configuration file for you.
+
+  Here is a sample session from one of my systems:
+
+    E:\MTCP>set mtcpcfg=e:\mtcp\tcp.cfg
+
+    E:\MTCP>dhcp
+    mTCP DHCP Client by M Brutman (mbbrutman@yahoo.com) (C)opyright 2008-2010
+      Version: Jul  5 2010 (Watcom)
+
+    DHCP request sent, waiting for response.  Press [ESC] to abort.
+
+    IPADDR = 192.168.2.101
+    NETMASK = 255.255.255.0
+    GATEWAY = 192.168.2.1
+    NAMESERVER = 24.159.193.40
+    LEASE_TIME = 86400 seconds
+
+    Settings written to 'e:\mtcp\tcp.cfg'
+
+    IP: TcpRcv: 0 UdpRcv: 4 IcmpRcv: 0 PW: 0 CSumE: 0 ProtE: 0
+    Packets: Sent 2: Rcvd: 5 Dropped: 0 LowFreeBufCount: 8
+
+
+  Now you can run one of the mTCP applications, like Telnet, FTP or IRCjr.
+
+  Note that you only have to run DHCP.EXE once in a while.  The exact
+  timing depends on your DHCP server, but a good rule of thumb is once
+  a day before you start using mTCP applications. If your machine is
+  acting strange and can't connect to other machines it will not hurt
+  you to run DHCP.EXE again - the DHCP server might have dropped your
+  machine due to a reset or a short lease time.  (In the example above
+  my DHCP server handed out an address that was good for 86,400 seconds,
+  which works out to 24 hours.)
+
+
+
+Configuring by Hand (Static addresses)
+
+  If you have the packet driver loaded and the MTCPCFG environment
+  variable pointing at a good configuration file then you are ready
+  to run the mTCP applications right now.
+
+  The next section has a detailed description of all of the networking
+  parameters that might be interesting if your are configuring by hand.
+
+
+
+List of networking related parameters
+
+  These are the common parameters used by the TCP/IP stack.  Program
+  specific parameters are discussed in the next session.
+
+
+    PACKETINT
+
+      This is the software interrupt number that the packet driver
+      is listening on.  This has to match the software interrupt number
+      that you told the packet driver to use.  It is specified in
+      hexadecimal notation.  (eg: 0x60)
+
+      This is always required for Static and DHCP setups.
+
+
+    IPADDR
+
+      IP address of this machine (eg: 192.168.2.3)
+
+      Required for Static setups, filled in by DHCP on dynamic setups.
+
+
+    NETMASK
+
+      Network mask setting for your local area network (eg: 255.255.255.0)
+      The network mask is used to determine if a target for a packet is on
+      your local network or on a remote network.  Packets going to a
+      remote network need to have a GATEWAY configured.
+
+      Required for Static setups, filled in by DHCP on dynamic setups.
+
+
+    GATEWAY
+
+      The IP address of your router (eg: 192.168.2.1)
+
+      Optional for Static setups, filled in by DHCP on dynamic setups.
+      If you don't provide this or if you set it wrong you will not be
+      able to communicate with machines that are not directly connected
+      to your LAN.
+
+
+    MTU
+
+      The MTU size for your Ethernet (typically 1500).  A setting of
+      1500 provides the best performance, but might not work perfectly
+      on mixed networks where fragmentation is possible.  A setting of
+      576 should be safe for almost all environments.  SLIP and PPP
+      users will have a smaller value depending on their SLIP or
+      PPP connection.
+
+      Please see the separate section on MTU for a more detailed
+      discussion.
+
+      Optional for static setups and dynamic setups.
+
+
+    NAMESERVER
+
+      The IP address of your nameserver (eg: 68.115.71.53)
+
+      Optional for Static setups, filled in by DHCP on dynamic setups.
+      If you don't provide this or if you set it wrong you will not
+      be able to convert machine names to IP addresses.
+
+
+    HOSTNAME
+
+      The hostname of your machine.  The hostname can be up to twenty
+      characters, and should conform to internet standards.  (Avoid
+      punctuation and you should be fine.)
+
+      Optional for static setups and dynamic setups.
+
+
+
+Other configuration parameters in the configuration file
+
+  The mTCP configuration file can be used for more than network
+  configuration.  Other mTCP applications will read it to look for their
+  configuration settings.
+
+  In general, you can put anything you want in the configuration file.
+  Lines that the DHCP client don't understand will be left unaltered.
+  Here are the rules:
+
+  * Blank lines are ok
+  * Lines should never exceed 75 characters
+  * If you use the DHCP client, it will rewrite the configuration file
+    and write new values for IPADDR, NETMASK, GATEWAY, and NAMESERVER.
+    The previous values will be lost, but no other lines in the file
+    will be altered.
+  * Other mTCP programs read but do not alter the file.  They will skip
+    lines that they do not understand.
+
+  So for example, here is a more complex mTCP configuration file:
+
+    DHCPVER DHCP Client version Apr 26 2009
+    TIMESTAMP Sun Apr 26 17:59:54 2009
+
+    # Parms for my machine
+    #
+    packetint 0x60
+    mtu 1500
+    hostname DOSBox
+
+    # IRCjr parms
+    #
+    ircjr_nick Brut_DOSBox
+    ircjr_user Brutman
+    ircjr_name Brutman on IRCjr for DOS
+    ircjr_connect_timeout 15
+    ircjr_register_timeout 60
+
+    # FTP parms
+    #
+    ftp_connect_timeout 15
+
+    # DHCP generated settings will appear here
+    #
+    IPADDR 192.168.2.102
+    NETMASK 255.255.255.0
+    GATEWAY 192.168.2.1
+    NAMESERVER 24.159.193.40
+    LEASE_TIME 86400
+
+
+  Note that the DHCP client adds/releaces the first two lines of the file
+  and the last five lines of the file.  The rest of the lines in the file
+  are kept as is for the other applications.
+
+  Configuration parameters for each application are documented by that
+  application.  The sample file above is just a sample; it is not
+  complete, and possibly not accurate. ;-)
+
+
+
+More on the MTU setting
+
+  MTU stands for 'Maximum Transmission Unit' and it tells the TCP/IP stack
+  how big of a packet it can send on the local network.  Bigger packets
+  generally mean less overhead.
+
+  In a world where all networks are built using the same technology the
+  MTU setting would not be needed.  But that is not our world.  Ethernet
+  predominates, but there are other physical transports out there that
+  you might not be aware of that you are using.  Your Ethernet traffic can
+  be transmitted over many different things that don't look like Ethernet
+  before it reaches its final destination.
+
+  TCP/IP uses 'fragments' to deal with this problem.  If a packet is too
+  big to pass from one network to another the gateway machine will break
+  the packet into fragments suitable for the next network.  It is possible
+  that a single packet will be broken into fragments multiple times over the
+  course of its journey.  The receiving side is responsible for gathering
+  all of the fragments for an IP packet together and reassembling them.
+
+  While this process works it is not ideal.  It causes a performance
+  loss as the packets are fragmented by the gateways and a bigger performance
+  loss when the fragments reach their final destination and have to be
+  reassembled.  In addition to the performance loss, it requires quite
+  a bit of memory too.  And losing a fragment hurts performance even more
+  because all of the other fragments for that packet have to be thrown
+  away.
+
+  In the real world fragments are rare.  Most modern servers using TCP
+  sockets do some form of path MTU discovery to determine the largest
+  packet that can be sent without causing fragments to be created.
+  For a TCP socket it works very well and you will have to work hard to
+  try to get a server to send you a packet that needs fragmenting.
+
+  On the other hand, that mechanism is not applicable to UDP packets.
+  A server sending a UDP packet has no choice about how to 'chunk' the
+  data to avoid fragmentation; it has to send what the application says
+  to send.  Most UDP based programs avoid sending large packets that will
+  be fragmented, but there are exceptions.  (NFS and programs sending
+  streaming video data are two notable exceptions.)
+
+  mTCP supports the reassembly of fragmented packets, with some restrictions.
+  There is a limit on the total size of the fragmented packet that is set
+  at compile time, and there is a limit to the number of fragments that
+  can be reassembled at the same time.  Currently those limits are set at
+  1500 bytes per packet, and 4 packets at a time.  While low, those limits
+  will protect you against a server on a standard Ethernet that goes
+  through a misconfigured gateway that causes fragments to be created.
+  (For UDP applications that require larger packets that can be set at
+  compile time when such an application is created.  There are no such
+  applications available at the moment.)
+
+  Even though mTCP can reassemble fragments there are still all sorts
+  of fragment related dangers floating around out there:
+
+  - Some TCP/IP servers set the 'Dont Fragment' bit on their packets
+    If the packet needs fragmentation at a gateway and this bit is
+    set, the packet effectively gets dropped at the gateway.  mTCP will
+    have no knowledge and no way to get around the dropped packets, other
+    than mysterious timeouts from the application.  While the server might
+    be trying to avoid additional overhead caused by fragmentation, it is
+    really doing a disservice by forcing these packets to be dropped.  (I'd
+    rather get the data slowly than not get it at all.)
+
+  - Some home router/firewalls throw fragments away rather than try to
+    process them correctly.  This is especially true when NAT (Network
+    Address Translation) is used.
+
+
+  The good news is that you have some control over the problem.
+
+  Applications that use TCP sockets will tell the remote side what their
+  MSS (Maximum Segment Size) is.  (MSS is based on MTU.)  This happens
+  during the socket connect and once the remote side knows your MSS it
+  will not knowingly send you a packet that needs to be fragmented.
+  (Something in the middle might cause fragmentation, so it is still
+  possible.  MTU path discovery is supposed to avoid that danger by
+  actively probing all gateways between the server and your machine.)
+
+  If you are having problem with dropped packets on a TCP socket, set
+  your MTU to 576.  That is guaranteed to work on all gateways and
+  all routers.  This is also the default for mTCP if you do not specify
+  an MTU size.
+
+  UDP should not have this problem; if an application knowingly sends
+  a large packet it will not turn on the Dont Fragment bit in the IP
+  header.  Doing so would effectively break the application, as the data
+  would never be able to get out.  On a large UDP packet fragmentation
+  is the only solution; there is no concept of MSS.  Most UDP packets
+  used by mTCP never exceed 512 bytes of data, so fragmentation is not
+  an issue.
+
+  For best performance set MTU has large as you can.  For Ethernet that
+  value is usually 1500 bytes.  This minimizes the overhead of the
+  protocol headers and minimizes interrupt handling.
+ 
+  If you are having strange connection issues you might be bumping into
+  a fragmentation problem.  Many times there is no warning message because
+  the packets just simply don't arrive, and the ICMP messages get sent
+  directly to the server, not the mTCP code.  If this happens set your
+  MTU to 576 and try again.
+
+  SLIP and PPP connections generally have smaller MTU settings which may
+  cause fragmentation.  This is unavoidable; consider it part of the joy
+  of using low speed point-to-point links.  Your local gateway that is
+  providing the SLIP or PPP connectivity will generate fragments that
+  mTCP will have to reassemble.
+
+
+
+SLIP and PPP Notes
+
+  I designed and implemented everything all of this code assuming
+  Ethernet.  Quite a bit down the road somebody pointed out that my
+  code was inaccessible to an entire class of people using SLIP (Serial
+  Line IP) and PPP, which is often used on dialup.
+
+  I've tested the code using SLIP and PPP.  Here are the key things
+  you need to be aware of.
+
+  - You need to use a packet driver that simulates Ethernet.
+  SLIPPR and CSLIPPER can do this for SLIP connections, and DOSPPP
+  can do this for PPP connections.  For SLIPPR use the "ether" option to
+  do this.  For DOSPPP use the EPPPD program.
+
+
+  - mTCP assumes that ARP is necessary, which is completely wrong on
+  a point to point connection.  It will not get a response to an ARP
+  query for the gateway, and it will time out.  To avoid this set
+  the following environment variable:
+
+    set MTCPSLIP=true
+
+  Do this for both SLIP and PPP.
+
+  This environment variable stuffs a bogus ARP entry into the mTCP
+  ARP table for your gateway.  That allows it to immediately send
+  packets to the gateway without sending an ARP request.  The
+  Ethernet address in the sent packets will be wrong, but nothing
+  is looking at it anyway.
+
+
+  - I've tested configurations using static addressing.  You will
+  have to find a way to pass the IP address, netmask, etc. to mTCP
+  using it's configuration file.
+
+
+  - It's beyond the scope of this document to explain addressing
+  in a point-to-point configuration.  Here is something to keep in
+  mind though.
+
+  If you use the smallest possible netmask (255.255.255.252) you can
+  easily create a configuration that works.  With that netmask only
+  the last two bits are signifigant.  Considering the last two bits
+  only:
+
+    <30 bits of netmask>.0 - reserved address meaning 'this host'
+    <30 bits of netmask>.1 - usable, good for the gateway address
+    <30 bits of netmask>.2 - usable, good for your address
+    <30 bits of netmask>.3 - IP broadcast address for this network
+
+  Setting up your netmask and addresses like this is simple and should
+  avoid routing problems.  Basically you force mTCP to always send
+  things to the gateway because nothing else is on your subnet.
+
+  SLIP and PPP generally use smaller MTU settings than other networks
+  because their transport layer is slower.  Be sure that the mTCP MTU
+  setting reflects what your SLIP or PPP connection is using. 
+  Depending on the application, servers and gateways you may experience
+  some fragmentation, especially on UDP packets.  (TCP generally avoids
+  this by using the MTU setting to compute MSS.)
+
+
+How the configuration file works
+
+  At the beginning of time, mTCP used environment variables for all
+  of the configuration.  This worked well until the IRC client came
+  along and I had to start increasing the size of the DOS environment
+  space.  Then came the DHCP client - I couldn't find a way to set
+  environment variables from within the DHCP client and make them stick
+  for the next program without writing out a file.  At that point the
+  configuration file was born.
+
+  When the DHCP client starts up it reads the PACKETINT and HOSTNAME
+  parameters from the configuration file and ignores the rest.
+  (HOSTNAME is optional.)  It then tries to communicate with the DHCP
+  server on your network.  If it gets an address from the DHCP server
+  it will write a new configuration file.  All of the contents of the
+  old configuration file are copied, except for the IPADDR, NETMASK,
+  GATEWAY, NAMESERVER, and LEASE_TIME parameters which get updated
+  with new values at the end of the file.
+
+  Having DHCP write a configuration file has an interesting side effect.
+  It means that at its core, every mTCP application assumes static network
+  addressing.  They all read the configuration file to get the network
+  parameters, and they can't tell if the network parameters were set by
+  a human or a machine.
+
+  At startup each application looks for the MTCPCFG environment variable
+  and tries to read the configuration file.  It makes one pass to get the
+  networking parameters that it needs to initialize the TCP/IP stack.
+
+  If an application has other configuration parameters that it needs to
+  read it will reopen the configuration file and scan for them.  The
+  format for a parameter is a single token that represents the parameter
+  name, a space for a delimeter, and then the value of the parameter.  The
+  entire rest of the line is assumed to be the parameter.  Lines must be
+  under 75 characters in total length.
+
+
+
+
+More information: http://www.brutman.com/mTCP
+
+Created July 31st, 2008, Last updated April 26th, 2013
+(C)opyright Michael B. Brutman, mbbrutman@gmail.com

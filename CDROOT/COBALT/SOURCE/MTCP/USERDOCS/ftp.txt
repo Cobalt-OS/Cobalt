@@ -1,0 +1,288 @@
+mTCP FTP client
+2013-04-26 Version
+Michael Brutman (mbbrutman@gmail.com)
+
+
+Introduction
+
+  This is an FTP client like many other FTP clients you have
+  probably used before.  Features include fairly high performance,
+  low memory requirements, and compatibility with a wide
+  selection of FTP servers.
+
+
+Hardware requirements:
+
+  8088 processor or better
+  180KB available RAM (using standard buffer sizes)
+  CGA, Monochrome (MDA), EGA or VGA display
+  Supported Ethernet card, SLIP or PPP connection
+
+
+Software requirements:
+
+  DOS 2.1 or newer (DOS 3.3 or newer recommended)
+  Packet driver for your Ethernet card, SLIP or PPP connection
+
+
+Setup instructions
+
+  FTP is built using the mTCP library.  The setup instructions for
+  mTCP can be found in SETUP.TXT.
+
+
+Using FTP
+
+  FTP uses the following syntax:
+
+    ftp [-port <n>] <ftp_server_addr>
+
+  Options are:
+
+    -help               Show basic help text
+    -port <n>           Connect using port <n> instead of port 21
+
+
+  You have to specify the FTP server address on the command line.
+  After the control socket is opened you will be prompted for a
+  user ID and password.  After that you get a command line just like
+  on other FTP command line clients.
+
+  Here are some of the commands:
+
+    dir         - directory list (full details)
+    ls          - directory list (names only)
+    pager       - Pause ls or dir output after approximately n lines
+
+    cd          - change to a directory
+    cdup        - move up one directory
+    pwd         - print current working directory
+
+    lcd         - local change directory
+    lmd         - local make directory
+
+    ascii       - Set transfer type to 'ASCII'
+    image       - Set transfer type to 'image' or 'binary'
+    get         - Get a file
+    put         - Send a file
+    mget        - get multiple files
+    mput        - put multiple files
+
+    prompt      - Toggle mget/mput prompting on or off
+    xfermode    - Set default transfer mode - see section below
+
+    delete      - Delete a file
+    mkdir       - Make directory
+    rmdir       - Remove directory
+    rename      - rename a file on the server
+
+    quote       - Send a command to the FTP server directly
+    quit        - Quit
+    shell       - Shell to DOS
+    interactive - Switch from script file to keyboard input
+
+   
+  The program captures Ctrl-Break and Ctrl-C.  If you use Ctrl-Break
+  during a file transfer or directory listing the current operation
+  will stop (prematurely) and you will be returned to the command
+  line after a brief delay.  If you use Ctrl-Break or Ctrl-C at the
+  command line the program will end. (This might take up to 20
+  seconds depending on the state of the sockets, so please be
+  patient.)
+
+  The shell command should be used with care.  With the shell
+  command you can do local directory listings, rename local files,
+  look inside of files, and do most normal things.  Keep in mind that
+  while you are at the DOS command prompt the mTCP code is not
+  servicing the socket connection - if you stay in DOS too long you
+  might lose your connection to the FTP server.
+
+
+Transfer modes
+
+  The xfermode command requires a little explanation.
+
+  In the beginning of time FTP servers always sent data by doing a
+  connect to the FTP client, which was listening for the incoming
+  connection on a default port.  The FTP server in NCSA telnet
+  does this.  I will call this 'Classic' mode and you can tell this
+  FTP client to handle data transfers this way.
+
+  'Classic' mode is only useful for ancient FTP servers that can't
+  do anything else.  Most modern FTP servers will not connect to an
+  FTP client on the default ports and most firewalls/routers
+  wouldn't allow it anyway.
+
+  'Port' mode is the current default for many clients.  Instead of
+  having the FTP server connect to the client on default ports, the
+  client will tell the FTP server exactly what port it should use
+  for the connection.  This is slightly better than Classic mode,
+  and should be usable on more FTP servers, firewalls and routers.
+
+  'Passive' mode is probably the best and most compatible mode to
+  use with modern FTP servers.  It turns things around by making
+  the client connect to the FTP server to make data connections
+  instead of having the FTP server connect to the client.  (From
+  the standpoint of the FTP server it is 'passive' and it waits
+  for a connection from the client.)  This will work with almost
+  any firewall and router.  This is the mode I'd recommend using
+  too.  Passive is the default mode for this client.
+
+
+Filenames and Quoting
+
+  DOS does not allow a filename to have a space in it.  However,
+  you may find that FTP servers running real operating systems
+  do support filenames and directory names with spaces in them.
+
+  FTP supports adding quotes around filenames and directory
+  names so that you can work with these servers.  (You still have
+  to provide a legal DOS filename for receiving files.)
+
+  If you need to specify a filename that has the double quote
+  character in it use two double quote characters in a row.  This
+  will result in one double quote character being sent.  If you have
+  to deal with embedded spaces at the same time, add an extra set of
+  quotes to enclose the entire parameter.
+
+  Examples:
+
+    You enter ...    -> The server sees
+
+    "Spacey name"    -> Spacey name  (All one parm)
+    ""QuoteChar""    -> "QuoteChar"  (All one parm)
+    ""Quote Char""   -> Uh oh ..  you get "Quote as one parm
+                        and Char" as the second parm.  That is
+                        because the two sets of double quotes
+                        collapse into a single double quote, but
+                        do not do anything to mark it all as one
+                        parameter.
+    """Quote Char""" -> "Quote Char" (All one parm).  Note the
+                        usage of the triple quotes.
+
+
+
+Command line editing
+
+  If you are using FTP interactively you can take advantage of the
+  command line editor.  It does all that you would expect it to do:
+  backspace, delete, insert, home, end, etc.  It also includes a
+  ten line command buffer so that you can recall older commands
+  easily without retyping them.
+
+
+Scripting support
+
+  FTP will take input from a file redirected to stdin.  This allows
+  you to automate some simple tasks, like logging in to fetch a
+  file.
+
+  Here are some notes for using this support:
+
+  - Because you have to start FTP with stdin redirected from a file,
+    you will probably have to include your login information as the
+    first two lines of the script file.
+
+  - FTP will interpret "end of file" as "quit".  So when the script
+    ends, so does FTP.
+
+  - If you don't want FTP to quit when it hits the end of the script
+    file, add the "interactive" command to the end of the file.
+    This will tell FTP to start reading from the keyboard again.
+
+
+
+Advanced Configuration Parameters
+
+  The following are optional configuration settings that you can
+  put in your mTCP configuration file.  See SETUP.TXT for how
+  to make changes to that file.
+
+    FTP_CONNECT_TIMEOUT <n>
+
+      Set the timeout for a socket connection to n seconds.  The
+      default timeout is 10 seconds.
+
+
+    FTP_TCP_BUFFER <n>
+
+      Set the size of buffer used by TCP for receiving data to n bytes.
+      The default is 8192 bytes.  For best performance this should
+      be set to a multiple of 1024 (1KB).  The default is reasonable
+      compromise between size and performance.  You can go lower
+      to conserve memory or up to 16384 bytes to improve performance.
+
+
+    FTP_FILE_BUFFER <n>
+
+      This controls the size of the buffer used to store data when
+      receiving a file.  The default is 8192 bytes.  For best
+      performance this should be set to a multiple of 1024 bytes.
+      The default is a reasonable compromise between size and
+      performance.  The maximum size is 32768 bytes.
+
+
+    FTP_SEND_FILE_BUFFER <n>
+
+      This controls the size of the buffer used to read file data
+      that is being sent by the FTP client.  The default is 8192
+      bytes.  For best performance this should be set to a multiple
+      of 1024 bytes.  The default is a reasonable compromise between
+      size and performance.  The maximum size is 16384 bytes.
+
+      (Sending a file requires less file buffering than receiving
+      a file.  Too large of a read buffer actually hurts
+      performance, which is why the maximum size is set to 16384
+      bytes.)
+
+
+    FTP_MLIST_BUFFER <n>
+
+      When you use MGET or MPUT FTP has to fetch a list of files
+      from the server or from your local machine.  This buffer
+      holds that list of files.  If the list of files is too long
+      the MGET or MPUT command will fail.
+
+      One solution is to change your filespec so that the list of
+      be transfered is smaller, and use multiple MGET or MPUTS to
+      do what you need.  The other solution is to increase this
+      buffer size.  The default size is 4096 bytes, which is plenty
+      for most usage.  The maximum size is 16384 bytes.
+    
+
+Support
+
+  Have a comment or need help?  Please email me at mbbrutman@gmail.com.
+
+
+Recent changes
+
+  2013-03-28: Allow for larger user commands; add some ability to
+              handle packets while waiting for user input; support
+              screens larger than 80x25; Fix 125 message handling.
+
+  2011-09-23: Make passive the default xfermode
+              Fix a small display bug when editing the current command
+
+  2011-05-27: First open source release (GPL3)
+
+  2011-01-02: Fix handling of multi-line error messages
+
+  2010-11-27:
+
+    Misc TCP library changes to improve handling when buffers
+      are full.
+    Add sending and receiving rate at end of transfers.
+    Watcom runtime workaround: improve compatibility with older machines
+
+  2010-10-20:
+
+    Add lmd command (local make directory)
+    Add command line editing with a 10 command recall buffer
+
+
+
+More information: http://www.brutman.com/mTCP
+
+Created January 18th, 2009, Last updated April 26th, 2013
+(C)opyright Michael B. Brutman, mbbrutman@gmail.com

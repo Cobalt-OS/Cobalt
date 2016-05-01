@@ -1,0 +1,189 @@
+/* $Id: init.S16,v 1.10 2004/04/27 06:48:59 hpa Exp $ */
+/* ----------------------------------------------------------------------- *
+ *   
+ *   Copyright 2001 H. Peter Anvin - All Rights Reserved
+ *
+ *   This program is free software; you can redistribute it and/or modify
+ *   it under the terms of the GNU General Public License as published by
+ *   the Free Software Foundation, Inc., 53 Temple Place Ste 330,
+ *   Bostom MA 02111-1307, USA; either version 2 of the License, or
+ *   (at your option) any later version; incorporated herein by reference.
+ *
+ * ----------------------------------------------------------------------- */
+
+/*
+ * init.S
+ *
+ * memdisk initialization code
+ *
+ * This module *MUST* get linked first into the image
+ */
+
+#include "version.h"
+
+		.text
+		.code16
+
+/*
+ * The header derives directly from the Linux kernel and must be first
+ * in the binary, hence section .init
+ */
+		.org 497
+setup_sects:	.byte 0			# Filled in later
+root_flags:	.word 0
+syssize:	.word 0
+swap_dev:	.word 0
+ram_size:	.word 0
+vid_mode:	.word 0
+root_dev:	.word 0
+boot_flag:	.word 0xAA55
+
+		.globl _start
+_start:
+		jmp	start
+
+ # This is the setup header, and it must start at %cs:2 (old 0x9020:2)
+	
+		.ascii	"HdrS"		# header signature
+		.word	0x0203		# header version number (>= 0x0105)
+					# or else old loadlin-1.5 will fail)
+realmode_swtch:	.word	0, 0		# default_switch, SETUPSEG
+start_sys_seg:	.word	0x1000		# obsolete
+version_ptr:	.word	memdisk_version-0x200
+					# pointing to kernel version string
+
+type_of_loader:	.byte	0		# = 0, old one (LILO, Loadlin,
+					#      Bootlin, SYSLX, bootsect...)
+					# See Documentation/i386/boot.txt for
+					# assigned ids
+	
+ # flags, unused bits must be zero (RFU) bit within loadflags
+loadflags:
+LOADED_HIGH	= 1			# If set, the kernel is loaded high
+CAN_USE_HEAP	= 0x80			# If set, the loader also has set
+					# heap_end_ptr to tell how much
+					# space behind setup.S can be used for
+					# heap purposes.
+					# Only the loader knows what is free
+
+		.byte	LOADED_HIGH	# Dont force the loader to move 
+					# us to 0x90000
+
+setup_move_size: .word  0		# Unused
+
+code32_start:				# here loaders can put a different
+					# start address for 32-bit code.
+		.long	0x100000	# 0x100000 = default for big kernel
+
+ramdisk_image:	.long	0		# address of loaded ramdisk image
+					# Here the loader puts the 32-bit
+					# address where it loaded the image.
+					# This only will be read by the kernel.
+
+ramdisk_size:	.long	0		# its size in bytes
+
+bootsect_kludge:
+		.word  0, 0
+
+heap_end_ptr:	.word  0		# (Header version 0x0201 or later)
+					# space from here (exclusive) down to
+					# end of setup code can be used by setup
+					# for local heap purposes.
+
+pad1:		.word 0
+cmd_line_ptr:	.long 0			# (Header version 0x0202 or later)
+					# If nonzero, a 32-bit pointer
+					# to the kernel command line.
+					# The command line should be
+					# located between the start of
+					# setup and the end of low
+					# memory (0xa0000), or it may
+					# get overwritten before it
+					# gets read.  If this field is
+					# used, there is no longer
+					# anything magical about the
+					# 0x90000 segment; the setup
+					# can be located anywhere in
+					# low memory 0x10000 or higher.
+
+ramdisk_max:	.long 0xffffffff	# Load ramdisk as high as
+					# absolutely possible
+
+/* ------------------- End of setup header --------------------------- */
+
+LOWSEG = 0x0800		# 0x8000 physical
+
+/*
+ * Move ourselves down in memory to reduce the risk of conflicts;
+ * the canonicalize CS to match the other segments...
+ *
+ * The C code uses 32-bit registers to make sure the high part of
+ * %esp is zero.
+ *
+ * The C code expects %cs == %ds == %es == %ss, and %fs == 0.
+ */
+start:
+		movw $LOWSEG,%ax
+		movw %ax,%es
+		movzbw setup_sects,%cx
+		inc %cx			# Add one for the boot sector
+		shlw $7,%cx		# Convert to dwords
+		xorw %si,%si
+		xorw %di,%di
+		movw %si,%fs		# %fs -> zero segment
+		cld
+		rep ; movsl %ds:(%si),%es:(%di)
+		movw %ax,%ds
+		movw %ax,%ss
+		xorl %esp,%esp		# Stack at the top of the segment
+		ljmp $LOWSEG, $startc
+
+startc:
+/*
+ * Copy the command line, if there is one
+ */
+		xorw %di,%di		# Bottom of our own segment
+		movl cmd_line_ptr, %eax
+		andl %eax,%eax
+		jz endcmd		# No command line?
+		movw %ax,%si
+		shrl $4,%eax		# Convert to a segment address
+		andw $0x000F,%si	# Starting offset
+		movw %ax,%gs
+		movw $496,%cx		# Maximum number of bytes
+copycmd:
+		lodsb %gs:(%si),%al
+		andb %al,%al		# Make sure we're null-terminated
+		jz endcmd
+		stosb %al,%es:(%di)
+		loopw copycmd
+endcmd:
+		xorb %al,%al
+		stosb %al,%es:(%di)
+/*
+ * Jump to 32-bit code
+ */
+		sti
+		call init32		# Call the 32-bit code
+		# The setup function returns the drive number,
+		# which should be returned in %dl
+		movw %ax,%dx
+
+		# If the 32-bit code returns, we are good to go, and the
+		# new boot sector is already loaded
+		cli
+		movw $0x7c00,%sp
+		xorw %si,%si		# Not a partition BS - SI <- 0
+		movw %si,%ds
+		movw %si,%es
+		movw %si,%fs
+		movw %si,%gs
+		movw %si,%ss
+		ljmp $0,$0x7c00		# Entrypoint at 0000:7C00
+
+		.section ".rodata","a"
+memdisk_version:
+		.ascii "MEMDISK " VERSION " " DATE
+		.ascii "Copyright " FIRSTYEAR "-" COPYYEAR " H. Peter Anvin"
+		.byte 0
+

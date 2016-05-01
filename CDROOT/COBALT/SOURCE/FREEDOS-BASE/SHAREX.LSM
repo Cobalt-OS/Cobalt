@@ -1,0 +1,14 @@
+Begin3
+Title:          Share
+Version:        0.99.1
+Entered-date:   2004-08-24
+Description:    Share - for FreeDOS kernel only
+Keywords:       Share, FreeDOS, DOS
+Author:         Ron Cemer
+Maintained-by:  Michael Devore (FreeDosStuff@devoresoftware.com)
+Primary-site:   ftp://ftp.devoresoftware.com/downloads/share.zip
+Original-site:  http://www.dosemu.org/~bart/share.zip
+Platforms:      DOS, FreeDOS
+Copying-policy: GNU LGPL
+End
+

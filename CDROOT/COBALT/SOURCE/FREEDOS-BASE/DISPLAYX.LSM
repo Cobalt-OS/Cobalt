@@ -1,0 +1,15 @@
+Begin3
+Title:          DISPLAY.SYS
+Version:        0.13
+Entered-date:   2006-08-01
+Description:    Add codepage management support to display management device
+                drivers
+Keywords:       Codepage, DISPLAY, FreeDOS
+Author:         Aitor Santamaria_Merino, Ilya V. Vasilyev
+Maintained-by:  Aitor Santamaria_Merino
+Primary-site:   http://www.ibiblio.org/pub/micro/pc-stuff/freedos/files/dos/display/
+Alternate-site: http://www.ibiblio.org/pub/micro/pc-stuff/freedos/files/dos/chcp/
+Original-site:  http://freedos.narod.ru/files/CHCP/
+Platforms:      FreeDOS, DOS
+Copying-policy: GPL
+End

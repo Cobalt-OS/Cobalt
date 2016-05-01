@@ -1,0 +1,478 @@
+	 $Id: comboot.doc,v 1.23 2004/02/03 06:14:15 hpa Exp $
+
+		       COMBOOT and COM32 files
+
+
+SYSLINUX supports simple standalone programs, using a file format
+similar to DOS ".com" files.  A 32-bit version, called COM32, is also
+provided.  A simple API provides access to a limited set of filesystem
+and console functions.
+
+
+	++++ COMBOOT file format ++++
+
+A COMBOOT file is a raw binary file containing 16-bit code.  It should
+be linked to run at offset 0x100, and contain no absolute segment
+references.  It is run in 16-bit real mode.
+
+A COMBOOT image can be written to be compatible with MS-DOS.  Such a
+file will usually have extension ".com".  A COMBOOT file which is not
+compatible with MS-DOS will usually have extension ".cbt".
+
+Before running the program, SYSLINUX sets up the following fields in
+the Program Segment Prefix (PSP), a structure at offset 0 in the
+program segment:
+
+ Offset	Size	Meaning
+ 0	word	Contains an INT 20h instruction
+ 2	word	Contains the paragraph (16-byte "segment" address) at
+		the end of memory available to the program.
+ 128	byte	Length of the command line arguments, including the leading
+		space but not including the final CR character.
+ 129	127b	Command line arguments, starting with a space and ending
+		with a CR character (ASCII 13).
+
+The program is allowed to use memory between the PSP paragraph (which
+all the CS, DS, ES and SS registers point to at program start) and the
+paragraph value given at offset 2.
+
+On startup, SP is set up to point to the end of the 64K segment, at
+0xfffe.  Under DOS it is possible for SP to contain a smaller
+value if memory is very tight; this is never the case under SYSLINUX.
+
+The program should make no assumptions about what segment address it
+will be loaded at; instead it should look at the segment registers on
+program startup.  Both DOS and SYSLINUX will guarantee CS == DS == ES
+== SS on program start; the program should not assume anything about
+the values of FS or GS.
+
+To exit, a program can either execute a near RET (which will jump to
+offset 0 which contains an INT 20h instruction, terminating the
+program), or execute INT 20h or INT 21h AH=00h or INT 21h AH=4Ch.
+If compatiblity with SYSLINUX 1.xx is desired, use INT 20h.
+
+
+	++++ COM32 file format ++++
+
+A COM32 file is a raw binary file containing 32-bit code.  It should
+be linked to run at address 0x101000, and should not contain any
+segment references.  It will be run in flat-memory 32-bit protected
+mode.  Under SYSLINUX, it will be run in CPL 0, however, since it may
+be possible to create a COM32 execution engine that would run under
+something like Linux DOSEMU, it is recommended that the code does not
+assume CPL 0 unless absolutely necessary.
+
+It is highly recommended that every COM32 program begins with the byte
+sequence B8 FF 4C CD 21 (mov eax,21cd4cffh) as a magic number.
+
+A COM32 file should have extension ".c32".
+
+On startup, CS will be set up as a flat 32-bit code segment, and DS ==
+ES == SS will be set up as the equivalent flat 32-bit data segment.
+FS and GS are reserved for future use and are currently initialized to
+zero.  A COM32 image should not assume any particular values of
+segment selectors.
+
+ESP is set up at the end of available memory and also serves as
+notification to the program how much memory is available.
+
+The following arguments are passed to the program on the stack:
+
+ Address  Size	Meaning
+ [ESP]    dword Return (termination) address
+ [ESP+4]  dword	Number of additional arguments (currently 5)
+ [ESP+8]  dword	Pointer to the command line arguments (null-terminated string)
+ [ESP+12] dword Pointer to INT call helper function
+ [ESP+16] dword Pointer to low memory bounce buffer
+ [ESP+20] dword Size of low memory bounce buffer
+ [ESP+24] dword Pointer to FAR call helper function (new in 2.05)
+
+This corresponds to the following C prototype, available in the file
+com32/include/com32.h:
+
+/* The standard prototype for _start() */
+int _start(unsigned int __nargs,
+	   char *__cmdline,
+	   void (*__intcall)(uint8_t, com32sys_t *, com32sys_t *),
+	   void *__bounce_ptr,
+	   unsigned int __bounce_len,
+	   void (*__farcall)(uint32_t, uint16_t, com32sys_t *, com32sys_t *));
+
+The intcall helper function can be used to issue BIOS or SYSLINUX API
+calls, and takes the interrupt number as first argument.  The second
+argument is a pointer to the input register definition, an instance of
+the following structure (also available in com32.h):
+
+typedef union {
+  uint32_t l;
+  uint16_t w[2];
+  uint8_t  b[4];
+} reg32_t;
+
+typedef struct {
+  uint16_t gs;			/* Offset  0 */
+  uint16_t fs;			/* Offset  2 */
+  uint16_t es;			/* Offset  4 */
+  uint16_t ds;			/* Offset  6 */
+
+  reg32_t edi;			/* Offset  8 */
+  reg32_t esi;			/* Offset 12 */
+  reg32_t ebp;			/* Offset 16 */
+  reg32_t _unused;		/* Offset 20 */
+  reg32_t ebx;			/* Offset 24 */
+  reg32_t edx;			/* Offset 28 */
+  reg32_t ecx;			/* Offset 32 */
+  reg32_t eax;			/* Offset 36 */
+
+  reg32_t eflags;		/* Offset 40 */
+} com32sys_t;
+
+The third argument is a pointer to the output register definition, an
+instance of the same structure.  The third argument can also be zero
+(NULL).
+
+Since BIOS or SYSLINUX API calls can generally only manipulate data
+below address 0x100000, a "bounce buffer" in low memory, at least 64K
+in size, is available, to copy data in and out.
+
+The farcall helper function behaves similarly, but takes as its first
+argument the CS:IP (in the form (CS << 16) + IP) of procedure to be
+invoked via a FAR CALL.
+
+
+	++++ SYSLINUX API CALLS +++
+
+SYSLINUX provides the following API calls.  SYSLINUX 1.xx only
+supported INT 20h - terminate program.
+
+NOTE: Most of the API functionality is still experimental.  Expect to
+find bugs.
+
+
+	++++ DOS-COMPATIBLE API CALLS ++++
+
+INT 20h		Terminate program
+INT 21h AH=00h	Terminate program
+INT 21h AH=4Ch	Terminate program
+
+	All of these terminate the program.
+
+INT 21h AH=01h	Get Key with Echo
+
+	Reads a key from the console input, with echo to the console
+	output.  The read character is returned in AL.  Extended
+	characters received from the keyboard are returned as NUL (00h)
+	+ the extended character code.
+	
+INT 21h AH=02h	Write Character
+
+	Writes a character in DL to the console (video and serial)
+	output.
+
+INT 21h AH=04h	Write Character to Serial Port
+
+	Writes a character in DL to the serial console output
+	(if enabled.)  If no serial port is configured, this routine
+	does nothing.
+
+INT 21h AH=08h	Get Key without Echo
+
+	Reads a key fron the console input, without echoing it to the
+	console output.  The read character is returned in AL.
+
+INT 21h AH=09h	Write DOS String to Console
+
+	Writes a DOS $-terminated string in DS:DX to the console.
+
+INT 21h AH=0Bh	Check Keyboard
+
+	Returns AL=FFh if there is a keystroke waiting (which can then
+	be read with INT 21h, AH=01h or AH=08h), otherwise AL=00h.
+
+INT 21h AH=30h	Check DOS Version
+
+	This function returns AX=BX=CX=DX=0, corresponding to a
+	hypothetical "DOS 0.0", but the high parts of EAX-EBX-ECX-EDX
+	spell "SYSLINUX":
+
+	EAX=59530000h EBX=4C530000h ECX=4E490000h EDX=58550000h
+
+	This function can thus be used to distinguish running on
+	SYSLINUX from running on DOS.
+
+
+	++++ SYSLINUX-SPECIFIC API CALLS ++++
+
+SYSLINUX-specific API calls are executed using INT 22h, with a
+function number in AX.  INT 22h is used by DOS for internal purposes;
+do not execute INT 22h under DOS.
+
+DOS-compatible function INT 21h, AH=30h can be used to detect if the
+SYSLINUX API calls are available.
+
+Any register not specifically listed as modified is preserved;
+however, future versions of SYSLINUX may add additional output
+registers to existing calls.
+
+All calls return CF=0 on success, CF=1 on failure.  The noted outputs
+apply if CF=0 only unless otherwise noted.  All calls clobber the
+arithmetric flags (CF, PF, AF, ZF, SF and OF) but leave all other
+flags unchanged unless otherwise noted.
+
+
+AX=0001h	Get Version
+
+	Input:	AX	0001h
+	Output:	AX	number of INT 22h API functions available
+		CH 	SYSLINUX major version number
+		CL 	SYSLINUX minor version number
+		DL 	SYSLINUX derivative ID (e.g. 32h = PXELINUX)
+		ES:SI	SYSLINUX version string
+		ES:DI 	SYSLINUX copyright string
+
+	This API call returns the SYSLINUX version and API
+	information.
+
+
+AX=0002h	Write String
+
+	Input:	AX	0002h
+		ES:BX	null-terminated string
+	Output:	None
+
+	Writes a null-terminated string on the console.
+
+
+AX=0003h	Run command
+
+	Input:	AX	0003h
+		ES:BX	null-terminated command string
+	Output:	None
+
+	This API call terminates the program and executes the command
+	string as if the user had entered it at the SYSLINUX command
+	line.  This API call does not return.
+
+
+AX=0004h	Run default command
+
+	Input:	AX	0004h
+	Output:	None
+
+	This API call terminates the program and executes the default
+	command string as if the user had pressed Enter alone on the
+	SYSLINUX command line.  This API call does not return.
+
+
+AX=0005h	Force text mode
+
+	Input:	AX	0005h
+	Output:	None
+
+	If the screen was in graphics mode (due to displaying a splash
+	screen using the <Ctrl-X> command in a message file, or
+	similar), return to text mode.
+
+
+AX=0006h	Open file
+
+	Input:	AX	0006h
+		ES:SI	null-terminated filename
+	Output:	SI	file handle
+		EAX	length of file in bytes
+		CX	file block size
+
+	Open a file for reading.  The exact syntax of the filenames
+	allowed depends on the particular SYSLINUX derivative.
+
+	The SYSLINUX file system is block-oriented.  The size of a
+	block will always be a power of two and no greater than 16K.
+
+	Note: SYSLINUX considers a zero-length file to be nonexistent.
+
+
+AX=0007h	Read file
+
+	Input:	AX	0007h
+		SI	file handle
+		ES:BX	buffer
+		CX	number of blocks to read
+	Output:	SI	file handle, or 0 if EOF was reached
+
+	Read blocks from a file.  Note that the file handle that is
+	returned in SI may not be the same value that was passed in.
+
+	If end of file was reached (SI=0), the file was automatically
+	closed.
+
+	The address of the buffer (ES:BX) should be at least 512-byte
+	aligned.  SYSLINUX guarantees at least this alignment for the
+	COMBOOT load segment or the COM32 bounce buffer.
+
+	Keep in mind that a "file" may be a TFTP connection, and that
+	leaving a file open for an extended period of time may result
+	in a timeout.
+
+	WARNING: Calling this function with an invalid file handle
+	will probably crash the system.
+
+
+AX=0008h	Close file
+
+	Input:	AX	0008h
+		SI	file handle
+	Output:	None
+
+	Close a file before reaching the end of file.
+
+	WARNING: Calling this function with an invalid file handle
+	will probably crash the system.
+
+
+AX=0009h	Call PXE Stack [PXELINUX ONLY]
+
+	Input:	AX	0009h
+		BX	PXE function number
+		ES:DI	PXE data buffer
+	Output:	AX	PXE return status code
+
+	Invoke an arbitrary PXE stack function.  On SYSLINUX/ISOLINUX,
+	this function returns with an error (CF=1) and no action is
+	taken.  On PXELINUX, this function always returns with CF=0
+	indicating that the PXE stack was successfully invoked; check
+	the status code in AX and in the first word of the data buffer
+	to determine if the PXE call succeeded or not.
+
+
+AX=000Ah	Get Derivative-Specific Information
+
+	[SYSLINUX]
+	Input:	AX	000Ah
+	Output:	AL	31h (SYSLINUX)
+		DL	drive number
+		ES:BX	pointer to partition table entry (if DL >= 80h)
+
+
+	[PXELINUX]
+	Input:	AX	000Ah
+	Output:	AL	32h (PXELINUX)
+		DX	PXE API version detected (DH=major, DL=minor)
+		ES:BX	pointer to PXENV+ or !PXE structure
+		FS:SI	pointer to original stack with invocation record
+
+		Note: DX notes the API version detected by PXELINUX,
+		which may be more conservative than the actual version
+		available.  For exact information examine the API
+		version entry in the PXENV+ structure, or the API
+		version entries in the ROMID structures pointed from
+		the !PXE structure.
+
+		PXELINUX will use, and provide, the !PXE structure
+		over the PXENV+ structure.  Examine the structure
+		signature to determine which particular structure was
+		provided.
+
+		The FS:SI pointer points to the top of the original stack
+		provided by the PXE stack, with the following values
+		pushed at the time PXELINUX is started:
+
+		[fs:si+0]	GS		<- top of stack
+		[fs:si+2]	FS
+		[fs:si+4]	ES
+		[fs:si+6]	DS
+		[fs:si+8]	EDI
+		[fs:si+12]	ESI
+		[fs:si+16]	EBP
+		[fs:si+20]	-
+		[fs:si+24]	EBX
+		[fs:si+28]	EDX
+		[fs:si+32]	ECX
+		[fs:si+36]	EAX
+		[fs:si+40]	EFLAGS
+		[fs:si+44]	PXE return IP	<- t.o.s. when PXELINUX invoked
+		[fs:si+46]	PXE return CS
+
+
+	[ISOLINUX]
+	Input:	AX	000Ah
+	Output:	AL	33h (ISOLINUX)
+		DL	drive number
+		ES:BX	pointer to El Torito spec packet
+
+		Note: Some very broken El Torito implementations do
+		not provide the spec packet information.  If so, ES:BX
+		may point to all zeroes or to garbage.  Call INT 13h,
+		AX=4B01h to obtain the spec packet directly from the
+		BIOS if necessary.
+
+	This call gives information specific to a particular SYSLINUX
+	derivative.  The value returned in AL is the same as is
+	returned in DL by INT 22h AX=0001h.
+
+
+AX=000Bh	Get Serial Console Configuration
+
+	Input:	AX	000Bh
+	Output:	DX	Serial port I/O base (e.g. 3F8h = COM1...)
+		CX	Baud rate divisor (1 = 115200 bps, 2 = 57600 bps...)
+		BX	Flow control configuration bits (see syslinux.doc)
+
+	If no serial port is configured, DX will be set to 0 and the
+	other registers are undefined.
+
+
+AX=000Ch	Perform final cleanup
+	Input:	AX	000Ch
+		DX	derivative-specific flags (0000h = clean up all)
+	Output:	None
+
+	This routine performs any "final cleanup" the boot loader
+	would normally perform before loading a kernel, such as
+	unloading the PXE stack in the case of PXELINUX.  AFTER
+	INVOKING THIS CALL, NO OTHER API CALLS MAY BE INVOKED, NOR MAY
+	THE PROGRAM TERMINATE AND RETURN TO THE BOOT LOADER.  This
+	call basically tells the boot loader "get out of the way, I'll
+	handle it from here."
+
+	For COM32 images, the boot loader will continue to provide
+	interrupt and BIOS call thunking services as long its memory
+	areas (0x1000-0xffff, 0x100000-0x100fff) are not overwritten.
+	MAKE SURE TO DISABLE INTERRUPTS, AND INSTALL NEW GDT AND IDTS
+	BEFORE OVERWRITING THESE MEMORY AREAS.
+
+	The permissible values for DX is an OR of these values:
+
+	SYSLINUX:	0000h	Normal cleanup
+
+	PXELINUX:	0000h	Normal cleanup
+			0003h	Keep UNDI and PXE stacks loaded
+
+	ISOLINUX:	0000h	Normal cleanup
+
+	All other values are undefined, and may have different
+	meanings in future versions of SYSLINUX.
+
+
+AX=000Dh	Cleanup and replace bootstrap code
+	Input:	AX	000Dh
+		DX	derivative-specific flags (see previous function)
+		EDI	bootstrap code (linear address, can be in high memory)
+		ECX	bootstrap code length in bytes (max 
+		EBX(!)	initial value of EDX after bootstrap
+		ESI	initial value of ESI after bootstrap
+		DS	initial value of DS after bootstrap
+	Output:	None
+
+	This routine performs final cleanup, then takes a piece of
+	code, copies it over the primary bootstrap at address 7C00h,
+	and jumps to it.  This can be used to chainload boot sectors,
+	MBRs, bootstraps, etc.
+
+	Normal boot sectors expect DL to contain the drive number,
+	and, for hard drives (DL >= 80h) DS:SI to contain a pointer to
+	the 16-byte partition table entry.  The memory between
+	600h-7FFh is available to put the partition table entry in.
+
+	For PXELINUX, if the PXE stack is not unloaded, all registers
+	(except DS, ESI and EDX) and the stack will be set up as they
+	were set up by the PXE ROM.

@@ -1,0 +1,140 @@
+mTCP DHCP Client
+2013-04-26 Version
+Michael Brutman (mbbrutman@gmail.com)
+
+
+Introduction
+
+  A DHCP client is a small utility that helps you automatically configure
+  the networking parameters for a machine, allowing it to use your
+  network.  This is an alternative to "static" addressing where you set
+  the network parameters for your machine manually.
+
+  Most home networks have a router that has a DHCP server built in,
+  making DHCP the preferred way to configure a machine for networking.
+  This DHCP client can be used to automatically configure the networking
+  parameters for all of the mTCP applications and with some cleverness
+  it can be used for other networking stacks as well.
+
+
+Hardware requirements
+
+  8088 processor or better
+  85KB available RAM
+  CGA, Monochrome (MDA), EGA or VGA display
+  Supported Ethernet card
+
+
+Software requirements
+
+  DOS 2.1 or newer
+  Packet driver for your Ethernet adapter
+
+
+Setup instructions
+
+  DHCP is built using the mTCP library.  The detailed setup instructions
+  for mTCP can be found in SETUP.TXT.
+
+  Here is the quick story:
+
+  Step 1: Load your packet driver.  If your packet driver loads correctly
+          it will probably report the MAC address of your Ethernet
+          hardware.
+
+  Step 2: Create a configuration file for mTCP.  The configuration file
+          is a text file that all mTCP apps will read when they start.
+          The smallest possible configuration file has one line in it
+          to tell mTCP where the packet driver is loaded.  Here is an
+          example:
+
+            packetint 0x60
+
+          Just replace the 0x60 with whatever software interrupt your
+          packet driver is set to use.  There are more things you can
+          add to the configuration file but this will get you started.
+
+  Step 3: Set the MTCPCFG environment variable to the full path and name
+          of the configuration file.  For example:
+
+            set MTCPCFG=c:\mtcp\tcp.cfg
+
+          And now you should be ready to run DHCP.  (See the section below.)
+
+
+Using DHCP
+
+  Usage is like this:
+
+    dhcp [options]
+
+  Options are:
+
+    -help           Show a help message
+    -retries <n>    Retry n times before giving up (default=3)
+    -timeout <n>    Set timeout for each attempt to n seconds (default=10)
+    -packetstats    Show packet statistics at the end
+
+
+  When DHCP runs it will send a series of UDP packets and try to
+  negotiate a DHCP lease with a DHCP server on your network.  If DHCP
+  is successful it will set a return code of 0, show the network
+  settings it received on the screen, and write the new network settings
+  to the mTCP configuration file.
+
+  If DHCP fails it will set a return code of 1.
+
+  You can check the return code in a batch file using ERRORLEVEL.
+  Here is a simple example:
+
+    ne2000 0x60 3
+    set mtcpcfg=e:\mtcp\tcp.cfg
+    dhcp -retries 3 -timeout 20
+    echo off
+    if errorlevel 1 goto Errmsg
+    echo DHCP worked
+    goto End
+    :Errmsg
+    echo DHCP failed!
+    :End
+
+
+  You should run this program at least once a day, and before running
+  any other mTCP programs.  This program will write the settings it
+  gets into a configuration file that the other mTCP programs will
+  look for and use.  (You do not need to run DHCP before each mTCP
+  application.)
+
+
+DHCP failures
+
+  DHCP is often the first thing that runs after a user does the
+  basic mTCP configuration.  As a result it is often the first thing
+  to fail.  The most common form of failure is a timeout.  Below
+  are some factors that can cause timeouts:
+
+    - a misconfigured card
+    - using the wrong packet driver
+    - bad parameters to the packet driver
+    - cabling/network issues
+
+  A detailed discussion of these factors can be found in
+  the DEBUG.TXT file.
+
+  In the unlikely event that you can not use DHCP you can still
+  use mTCP applications; you will have to do the network parameter
+  setup manually though.  See the SETUP.TXT file for details.
+  I have not yet met a DHCP server that mTCP does not work with
+  so being forced to do a manual setup is unlikely.
+
+
+Support
+
+  Have a comment or need help?  Please email me at mbbrutman@gmail.com.
+
+
+More information: http://www.brutman.com/mTCP
+
+Created May 20th, 2011, Last updated April 26th, 2013
+(C)opyright Michael B. Brutman, mbbrutman@gmail.com
+

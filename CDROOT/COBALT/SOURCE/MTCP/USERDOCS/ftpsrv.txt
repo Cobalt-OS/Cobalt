@@ -1,0 +1,884 @@
+mTCP FTP server
+2013-04-26 Version
+Michael Brutman (mbbrutman@gmail.com)
+
+
+Table of Contents (sorry, this file is big!)
+
+  Introduction
+  Hardware and Software requirements
+  mTCP Library Setup instructions
+  Before you fire it up ...
+  Quick Start Instructions
+  FTP server background information
+    Active connections vs. Passive connections
+    UserIDs, Anonymous FTP, and permissions
+  Configuration parameters
+  Choosing the number of clients
+  Setting up the password file
+  Setting up Anonymous FTP  
+  DOS filesystem limitations
+  Using mTCP FTP server with a firewall
+  Starting, running and ending the FTP server
+    Starting
+    Running
+    Ending
+  Notes on specific FTP clients
+  Support
+  Appendix A: Implemented RAW FTP commands
+
+
+
+Disclaimer
+
+  While I make nearly every attempt to ensure that my code is free
+  from bugs and safe to run on your system, I am not perfect and things
+  can happen.  You are encouraged to test this code in isolation on a
+  machine that you can afford to reinstall to get comfortable with it.
+  While that's extreme, it's probably the only prudent thing to do with
+  any new code.
+
+  Use this, and anything else that I write at your own risk.  I take no
+  liability for anything that might happen to you, your computer, your
+  network, house, descendents, pets, etc.
+
+
+Introduction
+
+  This is an FTP server for DOS.  Some of the features include support for
+  passive and active connections, support for multiple users at the same time,
+  a sandbox mode which is useful for setting up anonymous FTP, and  good
+  compatiblity with a wide variety of FTP clients.
+
+
+Hardware and Software requirements:
+
+  8088 processor or better
+  190KB available RAM for 1 client, more required for up to 10 clients
+  CGA, Monochrome (MDA), EGA or VGA display
+  Supported Ethernet card, SLIP or PPP connection (Ethernet recommended)
+
+  DOS 3.3 or newer (DOS 2.1 or newer probably works but was not tested)
+  Packet driver for your Ethernet card, SLIP or PPP connection
+
+
+mTCP Library Setup instructions
+
+  FTP is built using the mTCP library.  The setup instructions for
+  mTCP can be found in SETUP.TXT.
+
+
+Before you fire it up ...
+
+  Setting up and running an FTP server is a little more involved than running
+  the other mTCP applications.  You need to consider your security and
+  performance requirements.  Security is especially important; an FTP user
+  with full priviledges to your system can do serious damage, accidental or
+  otherwise.
+
+
+Quick Start Instructions
+
+  [1] Configure mTCP and ensure that you have basic network connectivity.
+  You should be able to run the other mTCP applications first.
+
+  [2] Add the FTPSRV_PASSWORD_FILE and FTPSRV_LOG_FILE configuration
+  parameters to the mTCP configuration file
+
+  [3] Create a minimal password file.  (See the included sample file,
+  ftppass.txt)
+
+  [4] Run.  You should be able to use the FTP server from machines on
+  your home network with no further configuration.
+
+  [5] If you are planning on offering anonymous FTP on the internet
+  or using it with FTP clients on the other side of a firewall, read the
+  rest of this file.
+
+
+
+FTP server background information
+
+  Active connections vs. Passive connections
+
+    FTP clients connect to FTP servers on a socket connection known as the
+    control connection.  The client sends commands and gets return codes on
+    the control connection.  FTP servers usually listen for new control
+    connections on port 21, although other non-standard ports are possible.
+
+    When an FTP client and server wish to exchange data they will open a new
+    socket connection that will be used for that one data transfer.  A data
+    transfer is a directory listing, a file send or a file receive.  (Yes,
+    even a directory listing requires a new socket connection.)  After the
+    data transfer is done the new socket is closed, leaving only the original
+    control connection.  Data connections are not used for more than one data
+    transfer.
+
+    There are two ways the new socket connection for data can be created.
+    An "active" connection is when the client tells the server where to
+    connect to, listens on a port, and waits for the server to open the new
+    socket connection.  A "passive" connection is when the client asks the
+    server to listen on a port and the client opens the new socket
+    connection.  Note that "active" and "passive" are from the point of
+    view of the server.
+
+    In the real world active connections are more difficult to support
+    because most home users are behind firewalls.  Firewalls cause problems
+    because they usually are permissive about letting machines make outgoing
+    connections to the rest of the world but they do not readily let
+    incoming connections in.  This is a problem because when in active mode,
+    an FTP server will have to make a new incoming data connection back to
+    the client.  Firewalls have special code to allow this incoming
+    connection but it often doesn't work correctly for a variety of reasons.
+
+    On the other hand, passive mode connections almost always work.  If
+    your client was able to create the control connection to the FTP server
+    in the first place, then it probably can create other connections to
+    the FTP server.  Passive mode is generally preferred by FTP clients
+    because it works with a wider variety of firewalls.
+
+    If you have a firewall it is probably optimized to allow FTP clients
+    make connections to the outside world.  Running an FTP server behind
+    a firewall becomes a problem because you need to allow incoming
+    connections from the outside world.  (We'll talk about that more later.)
+
+
+  UserIDs, Anonymous FTP, and permissions
+
+    Anonymous FTP allows anybody to connect to and use your FTP server.
+    There is no authentication required.  While useful for distributing
+    data, anonymous FTP can be dangerous when not configured correctly.
+
+    In addition to anonymous FTP the mTCP FTP server supports named FTP
+    accounts that require a password be entered.  Named accounts provide
+    more security but they are not foolproof either - FTP transmits passwords
+    in the clear and a named user can still do accidental damage to your
+    system.
+
+    To give you some control and security the mTCP FTP server has the
+    following features:
+
+    - The ability to lock a user into a specific part of the directory
+      hierarchy.  This ability can be used to create "sandboxes" that can
+      limit what users can see and do.
+
+    - The ability to restrict uploads to a particular directory whether the
+      user is in a sandbox or not.
+
+    - The ability to set permissions for individual operations that might
+      be destructive in some way, such as delete, make directory, remove
+      directory, rename, and store (store, store unique, or append) files.
+
+    - mTCP FTP server does not let you overwrite files when uploading.  You
+      must explicitly delete a file before replacing it.
+
+    It isn't difficult to setup the server in a secure way.  But it does
+    require a little planning.
+
+
+Configuration parameters
+
+  There are no command line options that are used when starting the FTP
+  server; all configuration parameters are set in the mTCP configuration file.
+  The following configuration parameters are recognized:
+
+  Required parameters:
+
+  FTPSRV_PASSWORD_FILE <path_and_filename>
+
+    This should be set to a full path and filename of a password file.
+    The password file format is explained in "Setting up the password file."
+
+  FTPSRV_LOG_FILE <path_and_filename>
+
+    This should be set to a full path and filename of a file that will be
+    used to log user connections and file transfers.  The file will be
+    appended to each time it is opened.
+
+
+  Optional parameters:
+
+  FTPSRV_SESSION_TIMEOUT <seconds>
+
+    This configuration parameter allows you to set the inactivity timeout
+    for FTP sessions.  The default is 180 seconds (three minutes).  The
+    maximum is 7200 seconds (two hours).  This configuration paramter is
+    optional.
+
+  FTPSRV_CONTROL_PORT <port number>
+
+    The standard port for an FTP server to listen to for new control
+    connections is port 21.  You may specify an alternate port if 21 is
+    not available or usable.  A lot of ISPs will block incoming access to
+    port 21, so to accept connections from the outside world you may need
+    to use a high numbered port such as 2021.  This is not standard so you
+    will need to make it clear to any possible client what the new port
+    number is.
+
+  FTPSRV_EXT_IPADDR <numerical ip address>
+
+    If you are behind a firewall and you are accepting passive connections
+    from the outside world you will need to use this option to tell the FTP
+    server what your external (public) IP address is.  This allows the FTP
+    server to put the correct connection information in the response to the
+    PASV command sent from the client.
+
+    See the section on firewall considerations for more information. 
+
+  FTPSRV_PASV_BASE <port number>
+
+    If you are accepting passive connections you can use this option to
+    specify a starting port number for passive data connections to use.  The
+    default starting port number is 2048.
+
+    Being able to set this value might be helpful for configuring your
+    firewall.
+
+  FTPSRV_PASV_PORTS <number of ports to use>
+
+    This option can be used to set the number of ports used for passive
+    data connections.  The default is to use 1024 different ports.
+
+    Being able to set this value might be helpful for configuring your
+    firewall.
+
+  FTPSRV_CLIENTS <number of clients>
+
+    This option is used to set the maximum number of clients that can be
+    connected at one time.  The default is three clients.  The maximum
+    number of connected clients is 10.
+
+  FTPSRV_MOTD_FILE <path_and_filename>
+
+    This should be set to a full path and filename of a file that will be
+    used to great new users when they first login to the FTP server.  The
+    file should consist of plain ASCII text with lines no longer than 70
+    characters.  The total file size should be no more than 600 bytes.
+
+  FTPSRV_FILEBUFFER_SIZE <n>
+
+    Each connected client has a buffer used for reading and writing files.
+    The default size is 8KB.  You can set it between 4KB and 16KB in 1KB
+    increments.  Larger buffer sizes perform slightly better, but on small
+    systems the total amount of buffer space can add up.
+
+  FTPSRV_TCPBUFFER_SIZE <n>
+
+    Each connected client has a buffer used for receiving data on the
+    TCP/IP data socket.  The default size is 8KB.  You can set it between
+    4KB and 16KB in 1KB increments.  Larger buffer sizes perform slightly
+    better, but on small systems the total amount of buffer space can add
+    up.
+
+    Buffer sizes below 8KB might cause flow control problems with faster
+    systems.
+
+  FTPSRV_PACKETS_PER_POLL <n>
+
+    This is an advanced option that only makes sense on smaller systems.
+
+    The FTP server checks the packet driver for new incoming packets to
+    process each time through the main program loop.  The most efficient
+    way to process packets is to scoop up any available packets that might
+    be available and process them all at the same time.  While efficient,
+    this can delay the sending of outgoing packets for a short time.  On
+    slow systems that delay can cause flow control problems with faster
+    systems.
+
+    This setting tells the FTP server how many packets to process each
+    time through the main program loop.  The default is 1, which is safe
+    for any system.  If you want to experiment with larger values for
+    better performance you can set it as high as 10.
+
+  FTPSRV_EXCLUDE_DRIVES <drive_letters>
+
+    This option allows you to exclude specific drive letters from the
+    scan for valid drive letters that is done when FTPSRV starts.  This
+    is useful if you want FTPSRV things like network drives or floppy
+    drives.  For example:
+
+      FTPSRV_EXCLUDE_DRIVES AB
+
+    will tell FTPSRV to ignore drive letters A and B, making them
+    unavailable to users even if they have diskettes in them.
+
+
+Choosing the number of clients
+
+  It doesn't take a lot of CPU to have a connected client.  In theory a
+  low end machine can handle many connected clients.  The problems start
+  when those clients try to transfer large amounts of data.
+
+  If you have multiple clients transferring files at the same time the
+  clients will be competing with each other for the following:
+
+  - CPU time
+  - Disk I/O
+  - Network I/O
+
+  Clients that are browsing directory listings are not a burden on the
+  system.  Clients that are actively transferring files will split these
+  resources.  Depending on the speed of your system multiple active clients
+  may reduce transfer speeds to an unacceptable level.
+
+  At the lowest end of the spectrum, an 8088 based PC XT with the original
+  MFM hard drive and a reasonable Ethernet card should be able to service
+  one file transfer at a rate of 30KB/sec.  Multiple clients will split
+  that bandwidth.
+
+  A higher end system like a 386-40 with an IDE hard drive can service one
+  file transfer at a rate around 400KB/sec.  Multiple clients splitting
+  this bandwidth is obviously not as much of an issue.
+
+  Besides the available bandwidth memory requirements are another
+  consideration.  Each connected client requires around 11KB.  If a file
+  transfer is in progress the client will require another 8KB for the length
+  of time the transfer is in progress.  Since it is unlikely that every
+  client will try to transfer a file at the same time, you can probably get
+  by with less than the worst case memory scenario.  I haven't measured it
+  precisely, but you should not need more than 400KB in the worst case.
+
+
+Setting up the password file
+
+  The location of the password file is set by the FTPSRV_PASSWORD_FILE
+  configuration parameter described in "Configuring the mTCP FTP server."
+
+  The password file is used to define which users are allowed to connect
+  to the FTP server and what directories and functions they can use.
+  There is one entry per line.  Entries are in the following format:
+
+    userid password sandbox_directory incoming_directory permissions
+
+  Userid
+
+    This can be up to 10 characters in length.
+
+  Password
+
+    Passwords can be up to 10 characters in length.  You may choose any
+    reasonable mix of characters for a password; one notable exception
+    is that spaces are not allowed.
+
+    If you use the keyword "[email]" (without the quotes) the FTP server
+    will prompt for an email address instead of a password and will permit
+    any user input except a blank line.  The "[email]" keyword is used to
+    implement anonymous FTP; be sure to read "Setting up Anonymous FTP"
+    before setting up anonymous FTP.
+
+    FTP passwords are always transmitted "in the clear" on the wire, so
+    they are not terribly secure.
+
+  Sandbox directory
+
+    If you wish to restrict a user to a specific directory (and all of
+    its subdirectories) set this field to be the fully qualified drive
+    letter and path of the directory.  If you do not want a user
+    restricted use the keyword "[none]" without the quotes but
+    with the brackets.
+
+    The drive and path format is not in the standard DOS format.  The
+    format used by the program is:
+
+      /drive_X/path
+
+    where X is a DOS drive letter.  For example, D:\FTP\INCOMING
+    is expressed as /drive_d/ftp/incoming.
+
+    When a sandbox is in use the user will be unaware that they are
+    being restricted to a sandbox.  They will just see the designated
+    directory as the top of the directory hierarchy.  For example, if
+    you specify a sandbox directory of "/drive_c/ftpdata" the user will
+    only see that directory as "/".  The FTP server automatically puts
+    "/drive_c/ftpdata" in front of any requests, and it prevents the user
+    from trying to escape the sandbox.
+
+    The sandbox must be specified using a full path, including drive
+    letter, in the format described above.
+
+    If a user is not restricted to a sandbox they are free to move to
+    any directory and drive letter on the system.  To switch drives
+    the user must use a path in the format described above.  For example,
+    to switch to drive E: the user would enter "cd /drive_e/".  This
+    syntax looks like a standard Unix path, which provides the best
+    compatibility with the widest range of clients.
+
+    (Previous versions of the FTP server used a more DOS-like syntax.
+    But compatibility with clients was a nightmare.  This works much
+    better now ... -Mike)
+
+  Incoming directory
+
+    If you want to restrict uploads to a specific directory enter the
+    directory name here.  If the user tries to upload a file in a
+    different directory the request will be denied.
+
+    If the user is also in a sandbox then the incoming directory
+    specified here should be a relative pathname within the sandbox.
+    For example, if the sandbox is "/drive_c/ftpdata" and this parameter
+    is "/incoming", then all uploaded files will be deposited in
+    "/drive_c/ftpdata/incoming".  (The user will see it as "/incoming"
+    due to the way the sandbox works.)
+
+    If the user is not in a sandbox then the incoming directory should
+    be an absolute pathname including a drive letter in the same format
+    described in "Sandbox directory".
+
+    If the user is not to be restricted then use the keyword "[any]"
+    (without the quotes).
+
+  Permissions
+
+    This field is used to control permission to commands that might
+    alter the filesystem.  You can choose to grant permission to all
+    commands by using the "all" keyword (without the quotes).  If you
+    don't use "all" you must grant permissions to each command
+    individually.
+
+    The commands you can grant permission to are:
+
+      DELE - delete a file
+      MKD  - create a directory
+      RMD  - remove a directory
+      RNFR - rename from (this is used to start a file rename)
+      STOR - store (receive a file from the client)
+      APPE - append (create a new file or append to an existing file)
+      STOU - store unique (receive a file form the client, but the server
+             picks a unique filename.)
+
+    If you do not grant permisson to a command the user can not use it.
+    The other FTP commands for changing directories, getting directory
+    lists, changing modes, etc. are always available.
+
+
+  Here is a sample password file that demonstrates a named user with no
+  restrictions, a named user with restrictions on uploading, an
+  anonymous account with uploading, and a readonly user with no
+  uploading:
+
+    brutman    passw0rd  [none]        [any]                  all
+    tester     b0guspw   [none]        /drive_e/ftp/incoming  stor stou
+    anonymous  [email]   /drive_e/ftp  /incoming              stor stou
+    readonly   [email]   /drive_e/ftp  [any]
+
+  The first user has no restrictions on directories and permission to use
+  all of the filesystem altering commands.  The second user can see
+  the entire system but is restricted to only uploading in one directory,
+  and they can only put files - they can't delete, create or remove
+  directories, or append to existing files.  The third user is restricted
+  to one directory and its subdirectories (a sandbox) and may only upload
+  to one directory within that sandbox.  The last user can only look in
+  one directory and its subdirectories (a sandbox) and may not upload.
+  (Ignore the [any] field, it's just holding a place.)
+
+
+
+Setting up Anonymous FTP
+
+  Setting up anonymous FTP is fairly easy but you should be aware of the
+  potential security problems if you do it wrong.
+
+  First, as an operating system DOS has no real user permission system.
+  The FTP server can do anything, and by extension your users can do
+  anything that the FTP server allows them to.  The operating system
+  does nothing to help keep things secure.
+
+  An anonymous user account is created when you set the password field
+  of a user account to "[email]".  The userid is traditionally named
+  "anonymous" or "ftp", but it can be any name if the password field is
+  set to "[email]".  Setting the password field to "[email]" turns off all
+  password checking for that user and simply records what the user enters
+  for the password as their email address.
+
+  It is absolutely necessary to lock anonymous users into a sandbox.  If
+  you do not, anonymous users will be able to look in any drive and any
+  subdirectory on your system.  Depending on how you set the permissions
+  to the FTP commands, it would be possible for an anonymous user to trash
+  your system.
+
+  If you plan on letting anonymous users upload you should designate a
+  directory within the sandbox that will be used to hold all uploaded
+  files.  That allows you to easily identify and sort new files in a
+  single place instead of having them spread through the sandbox.
+
+  The recommended user permissions for anonymous users are STOR and STOU.
+  This lets them upload files with a unique name that they choose, or with
+  a unique name that the server chooses.  mTCP FTP server will not
+  overwrite an existing file so both STOR and STOU are safe for existing
+  data.  APPE (append) is not safe; it can alter existing files, so it is
+  not recommended for anonymous FTP users.
+
+  If you do not plan on accepting uploads from anonymous users then do
+  not even give them STOR and STOU.  They will still be able to retrieve
+  files from anywhere in the sandbox.
+
+  Below are sample lines that can be used in the password file to implement
+  anonymous FTP.
+
+    anonymous [email]   /drive_e/ftpdata  /incoming stor stou
+    ftp       [email]   /drive_e/ftpdata  /incoming stor stou
+
+  These lines assume that the e:/ftpdata is the sandbox that the FTP
+  users will be using.  Store (STOR) and Store Unique (STOU) are granted,
+  and the user has to be in the /incoming directory to upload files.  (With
+  the sandbox taken into account the full path for the incoming directory
+  is /drive_e/ftpdata/incoming.)
+
+  Two different users with the same sandbox, incoming directory and
+  permissions are used because anonymous FTP usually honors both "anonymous"
+  and "ftp" as usernames.
+
+  It is possible to assign different users to different sandboxes; there
+  is no limitation on the number of sandboxes on a system.  (The sandbox
+  and upload directory are a per user setting.)  You can use this to have
+  different classes of anonymous users; perhaps one class is not allowed
+  to upload, while a second and slightly more priviledged class is allowed
+  to upload.
+
+
+DOS filesystem limitations
+
+  For those of you used to Unix or modern Windows systems this is going
+  to be a shock.  Here is the brief run-down on the DOS filesystem
+  and what the limits are:
+
+  A fully qualified filename in DOS looks like this:
+
+    d:\path\filename.ext
+
+  The maximum length for a fully qualified filename is 78 characters.  The
+  components are:
+
+   drive letter        2 characters (letter plus a colon)
+   path               63 characters including a beginning and ending "\"
+   filename           13 characters in 8.3 format
+
+  The official directory delimiter is always a "\" (backslash).
+
+  Valid characters for a filename are all letters, numbers, the following
+  punctuation characters !@#$%^&()-_{}`'~*? and all "high bit" characters
+  numbered ASCII 128 and above.  The rendering of high bit characters
+  depends on your active DOS codepage - mTCP FTP server assigns no meaning
+  to them at all.
+
+  If your user tries to use an invalid path or filename their request will
+  be rejected.  Gently remind them that they are on DOS, and that 8.3 isn't
+  just a pain in the rear, it's the law.
+
+  To keep compatibility with the largest number of FTP clients the FTP
+  server doesn't show DOS style drive letters and paths to connected users.
+  It rewrites the drive letter part to look like /drive_X/ where X is the
+  drive letter and the path delimeters use forward slashes, not backslashes.
+  The FTP server also presents the image of a root file directory '/' where
+  the subdirectories are the available drive letters.
+
+  A connected user must use a full path (in /drive_x/path/ form) to
+  change directories.  If a relative path is used it is relative to the
+  current drive letter and path for that user.
+
+
+Using mTCP FTP server with a firewall
+
+  If you plan on allowing users to use your FTP server through a firewall,
+  read on.  If you are not allowing access from people outside of your LAN
+  you can skip this section.
+
+  Most firewalls are designed with the needs of FTP clients in mind.  Now
+  you will be running a server, where things don't work so well.
+
+
+  Choosing a control port to listen on
+
+    If your ISP allows it use the standard FTP port (21).
+
+    If your ISP does not allow it or you want to improve your security
+    slightly choose an alternate port.  ISPs generally don't block ports
+    numbered 1024 and higher.  While it works, non-standard ports are not
+    as convenient for your clients to use.  (Your users will have to find
+    a way to specify the new port number in their client.)
+
+
+  Setup your firewall to forward the control port
+
+    Most firewalls block incoming connections from the internet.  This makes
+    sense, as your personal machines behind the firewall will make whatever
+    outgoing connections they need.  This doesn't work when you run a server
+    though.  You have to be able to allow incoming connections from the
+    outside world to get to your FTP server.
+
+    Most firewalls allow you to specify where incoming connections from
+    the outside world should be forwarded to.  The forwarding is done based
+    on port numbers.  Setup your firewall to forward incoming connections
+    on your chosen control port to the machine running the FTP server.
+
+
+  Setup your firewall to forward data ports
+
+    Clients connecting to your FTP server from the outside world are
+    probably behind firewalls that also do not allow for incoming connections.
+    They will probably need to use passive mode for data connections, which
+    means that they expect to make incoming connections to your FTP server.
+
+    By default mTCP FTP server will use ports 2048 through 3071 for data
+    connections.  (The starting port number and the number of ports to use
+    can be configured if the defaults are not suitable.)  You will need to
+    configure your firewall to pass all of these port numbers through to the
+    FTP server.
+
+
+  Tell mTCP FTP server your public IP address
+
+    If you are behind a firewall you are probably using a private,
+    non-routable address assigned by your firewall.  This address was obtained
+    using DHCP or configured by hand.  The firewall is responsible for
+    translating incoming and outgoing IP packets between the private
+    non-routable addresses and the public address assigned by your ISP.
+
+    This mapping is called "Network Address Translation" and it is normally
+    transparent to you.  There is a snag when running an FTP server; when
+    a client requests a passive connection for a data transfer the server
+    will respond with an IP address and port that the client should connect
+    to.  The FTP server knows its IP address, which is the local
+    non-routable address on your home network.  Without any intervention
+    that is the address it will give to the connected client requesting
+    a passive mode connection.  Clearly that address is wrong for an
+    external client.
+
+    To get around this you can use the FTPSRV_EXT_IPADDR configuration
+    parameter to tell mTCP FTP server what address it should send to
+    clients instead of the private, non-routable address that it knows.
+    The address to use is the public address that your ISP has assigned to
+    your firewall/cable modem/DSL modem.
+
+    A commercial grade firewall will modify the FTP server passive response
+    automatically, but home grade firewalls will not.  When a server is
+    running on a non-standard port almost no firewalls will be able to
+    fix the problem.  FTPSRV_EXT_IPADDR gives you a work around.
+
+    mTCP FTP server is smart enough to know if a client is on the same
+    internal LAN as it is, or if the client is coming from a different LAN.
+    If the client is on the same LAN as the server then the passive command
+    response will use the local non-routable private address.  That way your
+    local machines can use passive mode connections too.
+
+
+Starting, running and ending the FTP server
+
+  This assumes that your packet driver is loaded and that the basic work
+  to setup mTCP is done.  (You should have the MTCPCFG environment
+  variable pointing at a valid mTCP configuration file, and you should
+  have tested your network connectivity.)
+
+  Starting
+
+    To run ftpsrv, just go to the directory where it is located and
+    run it.  Ftpsrv will read the mTCP configuration file, and then scan
+    the password file.  If all looks good and it can get the memory that
+    it needs, it will start running.  If anything fails you should get an
+    error message that tells you what is wrong.
+
+    The three most common reasons for it to fail are:
+
+      - the mTCP configuration file can not be found or is not correct.
+      - the password file has an error in it.  Not all errors will be spotted,
+        but it has to look like a reasonable password file.
+      - You don't have enough memory available.
+
+    If mTCP starts running it will give you a set of messages, and then it
+    will start to use the screen to log events.  Events will also be written
+    to a log file on disk specified by the configuration file.
+
+    Successful startup will look something like this:
+
+      mTCP FtpSrv by M Brutman (mbbrutman@yahoo.com) (C)opyright 2009-2011
+        Version: Sep 28 2011
+
+      Opening password file at e:\ftppass.txt
+        Password file looks reasonable.
+
+      mTCP FtpSrv version (Sep 28 2011) starting
+
+      Clients: 10, Client file buffer size: 8192, TCP buffer size: 8192
+      Packets per poll: 1, TCP sockets: 21, Send buffs: 35, Recv buffs: 40
+      Client session timeout: 120 seconds
+      Control port: 21, Pasv ports: 2048-3071
+      Real IP address: 192.168.2.100, Pasv response IP addr: 8.8.8.8
+
+      Press [Ctrl-C] to end the server
+  
+    The Pasv response IP address and other parameters will be different for
+    your machine and configuration.
+
+    The top line of the screen has a small status line that shows you
+    the total number of connections and the number of active sessions.
+    The rest of the screen is used for log messages.
+
+    At this point your server is ready for incoming connections.
+
+
+  Running
+
+    The following keys are recognized on the console:
+
+      Alt-B: Toggle the beeper that signals when users sign on
+      Alt-H: Help
+      Alt-S: Show statistics
+      Alt-X: Exit
+
+    There is not much to do while the server is running.  I would turn off
+    the monitor and check on it once in a while by connecting to it with
+    an FTP command and using the SITE STATS or SITE WHO command.
+
+    If you are accepting uploaded files you should check for new files
+    and process them once in a while.  You can do this by downloading the
+    files to another machine, examining them, and then either moving them
+    using the rename command or deleting them from the server.  You should
+    have a rough idea of how much free space you started with; file uploads
+    will fail if you run out of disk space.  You can check the amount of
+    available disk space with the SITE DISKFREE command.
+
+    With five or less clients configured the mTCP FTP allocated enough
+    TCP/IP sockets to cover every possible combination of connections.
+    After five users it is assumed that not every client will try to do
+    a data transfer at the same time, so the worst case number of TCP/IP
+    sockets are not created.  If by some freak accident every connected
+    client does try to do a passive mode data connection at the same time
+    some of them might fail - the failure will be temporary and they will
+    be able to try again.
+
+    If more people try to connect than there are configured clients each
+    new connection will get a "421 - please try again later" message.
+
+    The default timeout period for an inactive session is three minutes.
+    You can set it as low as one minute or as high as 10 minutes.  An
+    inactive user should be disconnected within 10 seconds after exceeding
+    the limit.
+
+
+  Ending
+
+    To end the server hit Ctrl-C at the keyboard.  Ctrl-C will be recognized
+    within a second, and it will take up to 10 seconds to close all of the
+    current data connections.
+
+
+Notes on specific FTP clients
+
+  The FTP server presents the illusion of a Unix filesystem to connected
+  clients, even while allowing users to switch drive letters.  Hiding the
+  fact that it is running under DOS keeps the clients from getting
+  confused.  As a result, there should be very few client specific
+  problems.
+
+  Some clients send a LIST command assuming that there is a Unix system
+  running /bin/ls on the other end.  They send options with the LIST
+  command that are supposed to be interpreted by /bin/ls, but look like
+  a valid DOS filename.  (Hint: A '-' character is valid as the first
+  letter of a DOS filename.)  The FTP standard does not have a mechanism
+  for sending options on a LIST command so these clients are technically
+  broken.
+
+  Previous versions of FTP server did not handle these options and thus
+  it looked like clients could not get directory listings.  This version
+  ignores those options, which should improve compatibility with those
+  clients.
+
+  When running on a slow machine it is possible that faster clients will
+  flood the TCP/IP socket, causing the TCP/IP flow control mechanisms to
+  kick in.  Sometimes they kick in too hard and make file uploads very
+  unpredictable.  If this happens you can increase the file buffer and
+  TCP receive buffer sizes used, and if your client supports it throttle
+  the rate at which it sends data.  (FileZilla is one client that can do
+  this.)
+
+  The standard command line Windows XP FTP client does not support passive
+  mode data connections.  On an internal network this is not a problem, but
+  if there is a firewall between you and the Windows XP machine it will be
+  nearly worthless.  Get a better client.
+
+  Both Internet Explorer and Firefox work fine against mTCP FTP server
+  when an FTP url is used to access the server.
+
+  Google Chrome doesn't seem to understand FTP urls.  That is inexcusable.
+
+  Command line Linux clients have no known problems.
+
+  And of course the mTCP FTP client has no known problems. ;-0
+
+
+Support
+
+  Have a comment or need help?  Please email me at mbbrutman@gmail.com.
+
+
+Recent changes
+
+  2013-02-13: Enable the SIZE command; make FTPSRV 132 col aware
+  2013-12-23: Ignore UNIX style /bin/ls options on LIST and NLST
+  2012-04-29: Reduce memory utilization; add option to exclude drives
+  2011-09-28: Rewrite drive letter handling; fix MDTM command; rewrite
+              screen handling; add additional configuration parameters;
+              scan for valid drive letters at startup; add optional MOTD
+              file; misc bug fixes
+  2011-05-27: First open source release (GPL3)
+  2011-05-18: Fix parsing error on password file
+  2011-04-06: Change DOS path delimiter handling to make FileZilla happy
+  2011-01-02: First released version
+
+
+
+Appendix A: Implemented RAW FTP commands
+
+  USER        (only valid curing initial login)
+  PASS        (only valid during initial login sequence)
+
+  RNFR        rename from (original filename)
+  RNTO        rename to (new filename)
+  DELE        delete file
+  CWD/XCWD    change directory
+  CDUP/XCUP   move "up" one directory in the hierarchy
+  PWD/XPWD    print working directory
+  MKD/XMKD    make directory
+  RMD/XRMD    remove directory
+
+  PASV        request passive mode
+  PORT        use PORT mode
+  ABOR        abort current data transfer
+  LIST        directory list
+  NLST        name list
+  RETR        retrieve (send file to client)
+  STOR        store (receive file from client)
+  STOU        store unique (receive file, but server chooses a unique name)
+  APPE        append to existing file (or create a new file)
+
+  MODE        set transfer mode (only stream is supported)
+  STRU        structure (only file is supported)
+  TYPE        data transfer type (ASCII or BINARY)
+  SIZE        get the file size of a file (BINARY mode only)
+
+  HELP        help
+  ALLO        allocate (obsolete, but not an error)
+  FEAT        feature negotiation; will respond with MDTM
+  MDTM        modification type
+  NOOP        do nothing successfully
+  STAT        give server status or do a dir listing over the control socket
+  SYST        identify system type (responds with "215 DOS Type: L8")
+  SITE        do SITE specific commands
+
+  REIN        re-initialize (not supported)
+  ACCT        account (not supported)
+  REST        restart position (not supported)
+
+  SITE specific commands:
+
+  SITE DISKFREE  show free disk space for a given drive letter
+  SITE HELP      give help for the SITE command
+  SITE STATS     respond with some fun statistics
+  SITE WHO       show who is online
+
+
+
+More information: http://www.brutman.com/mTCP
+
+Created January 2nd, 2011, Last updated April 26th, 2013
+(C)opyright Michael B. Brutman, mbbrutman@gmail.com

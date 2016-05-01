@@ -1,0 +1,20 @@
+- Clean up the command-line parsing.
+
+- Cleaned up documentation, with a real man page.
+
+- Support for clusters larger than 16K.  This would require changing
+  a lot of the SYSLINUX internals so we can read partial clusters;
+  change the current "cluster pointers" to become
+  "cluster:sector pointers".  (32K may be doable.)  Microsoft
+  documentation claims that 32K is the maximum legal value although
+  "some versions of some systems allow 64K".
+
+- EBIOS support.
+
+- FAT32 support?
+
+- Support files that span multiple input media
+
+- Clean up the handling of sections
+
+- Add "localboot" support to SYSLINUX (using the ISOLINUX feature set.)

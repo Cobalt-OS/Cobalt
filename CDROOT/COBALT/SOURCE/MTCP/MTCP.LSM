@@ -1,0 +1,14 @@
+Begin4
+Title:          mTCP
+Version:        2013-04-26
+Entered-date:   2013-04-26
+Description:    A collection of lightweight TCP/IP programs for 16 bit realmode DOS: includes a DHCP client, an IRC client (IRCjr), an FTP client, a Telnet client, Netcat, HTGet, an FTP server, Ping, and an SNTP client.
+Keywords:       dos tcp/ip realmode dhcp ftp telnet htget irc ircjr netcat sntp ping opensource 16 bit
+Author:         Michael B. Brutman <mbbrutman _AT_ gmail.com>
+Maintained-by:  Michael B. Brutman <mbbrutman _AT_ gmail.com>
+Primary-site:   http://code.google.com/p/mtcp/
+Alternate-site: http://www.ibiblio.org/pub/micro/pc-stuff/freedos/files/net/mtcp/
+Original-site:  http://www.brutman.com/mTCP/
+Platforms:      DOS
+Copying-policy: GNU General Public License, version 3
+End

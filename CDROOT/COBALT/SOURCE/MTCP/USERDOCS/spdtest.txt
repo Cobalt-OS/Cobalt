@@ -1,0 +1,104 @@
+Spdtest - test your raw TCP socket performance
+2013-04-26 Version
+Michael Brutman (mbbrutman@gmail.com)
+
+
+Introduction
+
+  This program can be used to test the speed of your machine when
+  sending and receiving data on TCP sockets.  It has no practical
+  use other than for benchmarking so don't invest too much time
+  with it.
+
+  The basic idea is to send or receive data using the TCP library
+  without doing any extra processing on the data.  The data will
+  not be copied, written to disk, or manipulated in any way.
+  It will be fully processed by the TCP library though, just like
+  normal data - no shortcuts like not computing the checksums are
+  taken.  This allows you to determine the maximum speed you should
+  expect when sending or receiving data.  Actual applications will be
+  slower because they presumably do work.
+
+  I use this program to test the speed of new versions of the mTCP
+  code.  I also use it to figure out the relative speed of different
+  machines and Ethernet cards.
+
+
+Hardware requirements
+
+  8088 processor or better
+  190KB available RAM
+  CGA, Monochrome (MDA), EGA or VGA display
+  Supported Ethernet card, SLIP or PPP connection
+
+
+Software requirements
+
+  DOS 2.1 or newer (DOS 3.3 or newer recommended)
+  Packet driver for your Ethernet card, SLIP or PPP connection
+
+
+Setup instructions
+
+  Spdtest is built using the mTCP library.  The setup instructions for
+  mTCP can be found in SETUP.TXT.
+
+
+Using Spdtest
+
+  Spdtest uses the following syntax:
+
+    spdtest -target <ipaddr> <port> [options]
+    spdtest -listen <port> [options]
+
+  The first form of the command tells spdtest to create a socket
+  connection to another machine.  The second form of the command
+  is used to make spdtest wait for an incoming connection from
+  another machine.
+
+
+  Options are:
+
+    -help             Show basic help text
+    -srcport <port>   Use <port> as the source port when connecting
+    -receive          Do a receive only test
+    -send             Do a send only test
+    -mb <n>           Megabytes to send during a send test
+
+
+  Spdtest requires another machine to either send it data or to blast
+  data at.  To ensure a good benchmark the other machine should be
+  far faster than the machine you are testing.  For example, I use a
+  200Mhz Linux machine to test my slower PCs against.
+
+  The other machine should be running netcat.  If spdtest is doing a
+  send test then the other machine should be set to receive and throw
+  away the data as quickly as possible.  If spdtest is doing a receive
+  test then the other machine should be sending a fixed amount of data,
+  hopefully as fast as it can.
+
+
+Tips for getting accurate results
+
+  - Both machines should be on the same network
+  - The network should be relatively quiet
+  - The machines should be plugged into a switch, not a hub
+  - The test should run at least 10 seconds, and possibly up to a minute.
+    The longer you run the more accurate the results will be.
+  - Timing should be done with a stopwatch and on the other machine.
+    Some Ethernet card and packet driver combinations hold off interrupts
+    too long, distorting time on the machine running spdtest.
+  - Check the ending messages for network errors.  The test should run
+    cleanly; network errors are a sign of other problems.
+
+
+Support
+
+  Have a comment or need help?  Please email me at mbbrutman@gmail.com.
+
+
+More information: http://www.brutman.com/mTCP
+
+Created May 20th, 2011, Last updated April 26th, 2013
+(C)opyright Michael B. Brutman, mbbrutman@gmail.com
+

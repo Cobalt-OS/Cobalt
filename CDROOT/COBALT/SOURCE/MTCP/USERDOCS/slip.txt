@@ -1,0 +1,298 @@
+mTCP SLIP setup instructions
+Michael Brutman (mbbrutman@gmail.com)
+
+
+Introduction
+
+  The following are instructions for how to use mTCP over a SLIP connection.
+  PPP is similar but not discussed here.  (See PPP.TXT)
+
+
+Prerequisites:
+
+  - A known good connection between the machines.  This is usually done
+    with a null modem cable.  You need to verify this link works with
+    terminal emulation software before you start with SLIP - it makes
+    debugging much easier if you start with a known good setup.
+
+  - The "EtherSlip" packet driver.  Download a known working version from
+    here:
+
+      http://crynwr.com/drivers/pktd11.zip
+
+    (The filename in the zip is ETHERSL.COM.  Instructions are in
+    INSTALL.DOC.)
+
+    Other SLIP drivers are possible; I used EtherSlip as an example.  One
+    key point is that whatever SLIP driver you use should emulate an
+    Ethernet card for mTCP.  mTCP is expecting to use a packet driver
+    that is designed for Ethernet; that is known as a "class 1" packet
+    driver.  mTCP does not work with other classes of packet drivers,
+    including serial (class 6) and Token Ring (class 3).  EtherSlip
+    gets around this limitation by telling mTCP that it is an Ethernet
+    card even though it is actually using the serial port.
+
+
+Network setup for the examples provided here
+
+  My house is connected to the outside world with a cable modem that
+  gives me a dynamically allocated address on the global internet.  That
+  is connected to a home router, which then feeds the machines in the
+  house.  The router does network address translation (NAT) to provide
+  private addresses within the house.
+
+    Cable Modem  <->  Router       <->   Machines
+    96.x.x.x          192.168.2.1        192.168.2.x
+
+
+  Normally I use Ethernet connections on my DOS machines so they look
+  like any other PC in the house and can connect to the router directly.
+
+  To add a DOS machine using SLIP one of the machines in the house has
+  to serve as a gateway between Ethernet and SLIP.  I use an older Linux
+  machine to do this.  Here is what the network diagram is going to
+  look like:
+
+    Cable Modem  <->  Router       <->  Linux
+    96.x.x.x          192.168.2.1       192.168.2.10
+                                            |
+                                        192.168.2.121 <-> DOS (192.168.2.122)
+
+  The Linux machine has an Ethernet card and it is assigned address
+  192.168.2.10.  That is a static assignment; it never changes.  The DHCP
+  server in the router is told not to give out any addresses below
+  192.168.2.100 so there will not be a conflict.  (In thise case my DOS
+  machine with address 192.168.2.122 might cause a conflict, but I don't
+  have that many DHCP clients in my house.)
+
+  To enable SLIP the Linux machine will take on a second network address.
+  That network address must be chosen carefully.  Here is the process:
+
+    - Pick a number that is divisible by 4.
+    - No machine in your house should have a machine with that number or
+      the next three numbers after it.
+    - Your Linux machine will have that number + 1
+    - Your DOS machine will have that number + 2
+    - The other two numbers will be reserved and unused.
+    - Do not start with 0 or 252.
+
+  For example, the following addresses would be valid in this scheme:
+
+    Linux            DOS               Reserved
+    192.168.2.5      192.168.2.6       192.168.2.4 and 192.168.2.7
+    192.168.2.17     192.168.2.18      192.168.2.16 and 192.168.2.19
+    192.168.2.161    192.168.2.162     192.168.2.160 and 192.168.2.163
+
+
+  Other options are available, but those require advanced routing tricks.
+  Just find a block of four addresses divisible by four that are not in
+  use, follow the rules above, and you will be fine.  (I'll tell you the
+  hard way that adds new subnet for a beer or two.)
+
+
+
+Establish the SLIP connection between the two machines
+
+  On the Linux side you will be using the SLIP daemon (slattach).  The
+  important parameters to specify are:
+
+    - the protocol to use (slip, compressed slip, etc.)
+    - the serial port to use
+    - the speed to use
+
+  Here is an example:
+
+    slattach -p slip -s 9600 /dev/ttyS1
+
+  That says to use plain SLIP (not compressed) at 9600 bps over the
+  second serial port on the machine.
+
+  I had a devil of a time trying to get my serial port to work.
+  It looked as though it was receiving packets from the DOS machine
+  just fine, but it was not able to send packets because the handshaking
+  on the serial port wires was not correct.  I could see this using
+  ifconfig - packets were being resceived on the serial line interface
+  but not sent.  So besides the parameters above I used the following:
+
+    - "-L" to specify a local ("3 wire") connection
+    - "-m" to not initialize the line
+
+  And before running slattach I had to use stty to setup the speed and
+  handshaking for the port.  Here are the full commands that I used:
+
+    stty -F /dev/ttyS1 -clocal -crtscts 9600
+    slattach -p slip -L -m -s 9600 /dev/ttyS1
+
+  The stty command sets up the second serial port to not do flow control
+  or look for a carrier detect signal.  The speed will be set to 9600
+  bps.  Your results will probably vary from mine ...
+
+  slattach creates a network interface but nothing else.  Next we have
+  to tell Linux what IP address to use for that interface.  The ifconfig
+  command is used for that:
+
+    ifconfig sl0 192.168.2.121 pointopoint 192.168.2.122 mtu 576 up
+
+  Here I am using 192.168.2.121 for the IP address on the Linux side
+  and the DOS side is going to use 192.168.2.122.  (The spelling of
+  "pointopoint" is deliberately missing a "t" - that is the correct
+  syntax.)  The MTU size for the connection is 576, which is a safe
+  value.
+
+  On the DOS machine we need to run our SLIP driver to complete the
+  connection.  Using EtherSlip as an example:
+
+    ethersl 0x60 3 0x2f8 9600
+
+  That tells EtherSlip (ethersl) to install using software interrupt
+  0x60 on COM2 (IRQ3 and port 0x2f8) at 9600 bps.
+
+  EtherSlip doesn't let you just name a COM port to use - it wants you
+  to specify the hardware interrupt and I/O port address of the COM
+  port you are going to use directly.  Here are the common port
+  assignments:
+
+    COM1: IRQ 4, Port 0x3F8
+    COM2: IRQ 3, Port 0x2F8
+
+  Your hardware may vary ...  but you tested this port with a straight
+  terminal emulator first, right?
+
+  If EtherSlip is successful it will print out some status information,
+  including the "MAC" address of the simulated Ethernet card.
+
+
+Configuring mTCP
+
+  mTCP configuration is done as normal, but with a few changes:
+
+    [1] You need to set the MTCPSLIP environment variable to something.
+    The actual value does not matter; it just needs to exist.  At the
+    DOS command line this command will do the trick:
+
+      SET MTCPSLIP=true
+
+
+    [2] You should ensure that your MTU setting in the mTCP configuration
+    file matches what you told the SLIP daemon on Linux.  I recommend
+    using a value of 576.
+
+    [3] You need to setup the IP addresses statically because you will
+    not be using DHCP in this setup.  In particular you need to set the
+    IPADDR, NETMASK, and GATEWAY variables:
+
+      IPADDR: This is second IP address you used on the ifconfig command
+              in Linux.  In this example it is 192.168.2.121.
+
+      NETMASK: Linux uses a netmask of 255.255.255.255 to signify a point-
+               to-point link.  mTCP is thinking "Ethernet" so it wants
+               a netmask that reflects the addressing scheme more closely.
+               If you followed the rules above a netmask of 255.255.255.252
+               is correct for mTCP.
+
+               If you did not pick your addresses as per the rules above
+               you might be able to ping the Linux machine, but not other
+               machines.  Follow those rules carefully!
+
+      GATEWAY: If you plan to send packets past your Linux machine to
+               other machines the Linux machine will have to serve as
+               your gateway.  Put its SL0 address here.  In this example
+               it is 192.168.2.121.
+
+  If these are set correctly you should be able to run PING on the DOS
+  machine and get a response back from the Linux machine.  At 9600 bps on
+  a 386 class machine the time for a standard 32 byte PING packet should
+  be around 150ms.
+
+  If you ping from Linux to DOS you might not get a response; remember mTCP
+  only response when an mTCP application is running.  If you want to try to
+  ping from Linux run something simple on the mTCP machine.  Netcat in
+  "listen" mode will do the trick:
+
+    nc -listen 2000
+
+  That will enable you to test PING from Linux to DOS.
+
+  Now you have basic connectivity between the two machines.  Telnet, FTP,
+  IRCjr and other applications will work if the target machine is your
+  Linux machine.  Next we need to enable some advanced routing to go beyond
+  your Linux machine to other machines on your network and the outside
+  world.
+
+
+Going past your Linux machine
+
+  So far you have a "point to point" connection between the two machines
+  and the DOS machine can not see past the Linux machine.  In this section
+  we are going to do a few steps to give your DOS machine connectivity
+  to the rest of the world.
+
+  The first step is to turn on "proxy ARP" which is a trick that tells
+  the Linux machine to answer ARP requests from other machines on behalf
+  of your DOS machine, which is not directly connected to the network.
+  The "arp -s" command is used to set this up:
+
+    arp -s 192.168.2.122 00:90:27:FC:28:82 pub
+
+  Here we are telling the Linux machine that if it should see an ARP
+  request for IP address 192.168.2.122 (the IP address of the DOS
+  machine) that it should answer with its own MAC address, which is
+  "00:90:27:FC:28:82".  You need to use your own MAC address on your
+  machine - use the "ifconfig" command to find out what it is for
+  your Ethernet card.  For example, on my machine:
+
+    ifconfig eth0
+
+  responds with:
+
+    eth0  Link encap:Ethernet  HWaddr 00:90:27:FC:28:82
+          inet addr:192.168.2.10  Bcast:192.168.2.255  Mask:255.255.255.0
+          inet6 addr: fe80::290:27ff:fefc:2882/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:12914 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:15950 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000
+          RX bytes:1386899 (1.3 Mb)  TX bytes:1687851 (1.6 Mb)
+
+  where HWaddr is the MAC address of this particular ethernet card.
+  
+  After doing this other machines will be able to ping the DOS machine.
+
+  This is not sufficient for getting to machines past your Linux
+  machine though.  Your Linux machine still considers the SLIP link
+  to be a separate network.  All we need to do is to tell Linux to
+  route packets from one network to the other.  This is done by
+  turning on "IP forwarding."
+
+    echo 1 > /proc/sys/net/ipv4/ip_forward
+
+  Do that as root.  After that, when Linux sees a packet from an
+  outside network it will route it to the DOS machine running mTCP.
+
+  After that, you should be able to ping other machines on your home
+  network.  If you setup your nameserver in mTCP you should be able to
+  get to the outside world as well.  And other machines will be able
+  to ping your machine.
+
+
+Advanced options
+
+  What has been presented above is the bare minimum to get a DOS
+  machine running mTCP on a local home network.  Your home network
+  might not look like this, requiring more work.  Some other options
+  include:
+
+  - Running IP masquerading (NAT) on the Linux machine
+  - Running the SLIP network on a different subnet and having Linux
+    routing to that subnet.  This requires advanced routing on other
+    machines in your network if you are using non-routable networks
+    like 192.168.x.x.
+
+  All of this is left as an exercise to the interested reader. ;-0
+
+
+
+More information: http://www.brutman.com/mTCP
+
+Created April 2011, Last updated April 26th, 2013
+(C)opyright Michael B. Brutman, mbbrutman@gmail.com

@@ -1,0 +1,128 @@
+DOS Idle/Power control in mTCP Applications
+2013-04-26 Version
+Michael Brutman (mbbrutman@gmail.com)
+
+
+Introduction
+
+  Part of the mTCP design requires the application programmer to
+  periodically check for new packets that have arrived so that they
+  may be processed.  That check is supposed to be done when the
+  application is not actively working on something else; it is a
+  core part the idle loop in an event driven program.
+  
+  On old classic hardware running DOS such as the IBM PC or PCjr
+  this polling behavior does no harm.  But it does keep the CPU busy
+  and that can show up when using mTCP applications in a virtual
+  environment such as VirtualBox or VMWare.  A side effect is higher
+  power usage which is an important consideration for laptop users.
+
+
+How mTCP minimizes CPU usage
+  
+  Starting with the 2012-04-29 version mTCP applications will try
+  to minimize unnecessary CPU usage.  When in the idle loop 
+  each application will check for packets and work to do and if
+  nothing is found they will try to "sleep" for a short period.
+  The mechanisms to do this are: 
+  
+    - Calling the DOS "idle" interrupt 0x28.  Traditionally this
+      allows TSR programs to come active while DOS is waiting for
+      a keystroke but it is also a general purpose way for DOS
+      to signal that the machine is generally idle.
+      
+    - Calling int 0x2F function 0x1680.  This is the "VM yield
+      time slice" signal.
+
+
+  The first method (int 0x28) is controversial; many people will
+  claim that it is not needed.  It has existed since DOS 2.x
+  and it is documented as being used by DOS to signal to TSRs
+  that there is idle time.  After doing a lot of research and
+  testing there is no reason why an application should not
+  use it too, especially if the application does not use DOS for
+  keyboard input (thus depriving DOS the ability to call int 0x28
+  itself.)
+
+  If power saving is enabled in mTCP (which is the default) the
+  calls to int 0x28 will always be made during idle loops.
+
+  The second method (int 0x2f 0x1680) is well documented and should
+  work in other environments such as DOS boxes in Windows, OS/2,
+  and other virtual environments.  I've tested it in Windows XP
+  when using SwsVpkt.
+
+  When mTCP first starts up it will use int 0x2f function 0x1680
+  to see if the function is supported.  If it is supported mTCP
+  will use it during idle loops.
+
+
+Notes on POWER, FDADPM, and DOSIDLE
+
+  POWER
+
+    The standard power management utility for MSDOS and PCDOS is
+    POWER.EXE which is installed as a device driver and controlled
+    from the command line.
+
+    While POWER seems to work to reduce CPU consumption at the DOS
+    command line, it does not help with the mTCP idle loop.  So it
+    does not harm anything, but it doesn't help either.
+
+    POWER works correctly on real hardware and in VMWare.  But the
+    current version of VirtualBox seems to have a bug that causes
+    the FTP client to hang up and freeze when POWER is loaded.
+    If you see weird behavior like this under VirtualBox get rid
+    of POWER and use a different utility.
+
+
+  FDAPM
+
+    FDAPM is an open source replacment for POWER that ships with
+    FreeDOS and can be downloaded separately.
+
+    The FDAPM power control utility detects the calls to int 0x28 to
+    see when DOS is idle.  This has a very noticeable effect when
+    running mTCP applications with FDAPM loaded; instead of making
+    a processor fully busy the processor will idle at a low CPU
+    utilization.  Here is the command line I use to enable FDAPM:
+
+      fdapm apmdos
+
+    If you run that FDAPM will detect calls to int 0x28 and try
+    to adjust your hardware to save power.  For more information
+    on FDAPM go to: http://help.fdos.org/en/hhstndrd/base/fdapm.htm
+
+
+  DOSIDLE
+
+    DOSIDLE is an older power management utility that can replace
+    POWER.  I've not experimented a lot with it, but it works so well
+    that it forced mTCP to save power even when you have told mTCP
+    not to try to save power!
+
+    DOSIDLE can be found at:
+
+    http://maribu.home.xs4all.nl/zeurkous/download/mirror/dosidle.html
+
+
+Disabling power control
+
+  In the unlikely event that you need to disable the power control
+  calls in the mTCP idle loop you can set an environment variable.
+  The name of the variable is "MTCPSLEEP" and an example of how to
+  set it to disable power control is shown:
+
+    set MTCPSLEEP=0
+
+  If you do this mTCP will not attempt to call int 0x28 or
+  int 0x2f function 0x1680 while it is in an idle loop.
+
+
+
+More information: http://www.brutman.com/mTCP
+
+
+Created April 29th, 2012, Last updated April 26th, 2013
+(C)opyright Michael B. Brutman, mbbrutman@gmail.com
+
