@@ -23,6 +23,7 @@ echo  'Enable VT-x/AMD-V'. You will need to turn off the virtual machine
 echo  to do this.
 echo.
 pause >nul
+goto setup
 
 :setup
 SUSCR.EXE /D " Cobalt OS 1.2 Setup " /M "Press ENTER to continue."
@@ -141,10 +142,14 @@ CHOICE.EXE > nul
 if errorlevel 2 goto cancel
 SUSCR.EXE /D " Cobalt OS 1.2 Setup " /M "Deleting previous Cobalt installation..."
 DELTREE.COM /Y /Z:SERIOUSLY C:\SYSTEM
+SUSCR.EXE /D " Cobalt OS Repair " /M "Removing hidden flags on system files..."
+ATTRIB.COM -H C:\AUTOEXEC.BAT
+ATTRIB.COM -H C:\CONFIG.SYS
+ATTRIB.COM -H C:\KERNEL.SYS
 SUSCR.EXE /D " Cobalt OS 1.2 Setup " /M "Installing base DOS system..."
 SYS.COM A: C:
 SUSCR.EXE /D " Cobalt OS 1.2 Setup " /M "Decompressing BASE.ZIP..."
-UNZIP.exe -u -o BASE.ZIP -d c:\
+UNZIP.exe -o -q BASE.ZIP -d c:\
 if not errorlevel 0 goto error
 del c:\COMMAND.COM
 goto askdesktop
@@ -171,7 +176,7 @@ DEL C:\AUTOEXEC.BAT
 SUSCR.EXE /D " Cobalt OS 1.2 Setup " /M "Installing base DOS system..."
 SYS.COM A: C:
 SUSCR.EXE /D " Cobalt OS 1.2 Setup " /M "Decompressing BASE.ZIP..."
-UNZIP.exe -u -o BASE.ZIP -d c:\
+UNZIP.exe -o -q BASE.ZIP -d c:\
 if not errorlevel 0 goto error
 del c:\COMMAND.COM
 goto askdesktop
@@ -190,7 +195,7 @@ SUSCR.EXE /D " Cobalt OS 1.2 Setup " /M "Copying base system files..."
 FORMAT.EXE c: /z:seriously /v:COBALT /s /y
 if not errorlevel 0 goto error
 SUSCR.EXE /D " Cobalt OS 1.2 Setup " /M "Decompressing BASE.ZIP..."
-UNZIP.exe -u -o BASE.ZIP -d c:\
+UNZIP.exe -o -q BASE.ZIP -d c:\
 if not errorlevel 0 goto error
 del c:\COMMAND.COM
 goto askdesktop
@@ -205,23 +210,17 @@ echo.
 echo  Press Y to install the desktop, or N to skip this step.
 echo.
 CHOICE.EXE > nul
-if errorlevel 2 goto createrestore
+if errorlevel 2 goto finishsetup
 if not errorlevel 2 goto installdesktop
 
 :installdesktop
 SUSCR.EXE /D " Cobalt OS 1.2 Setup " /M "Decompressing DESKTOP.ZIP..."
-UNZIP.exe -u -o DESKTOP.ZIP -d c:\
+UNZIP.exe -o -q DESKTOP.ZIP -d c:\
 if not errorlevel 0 goto error
-goto createrestore
+goto finishsetup
 
-:createrestore
-SUSCR.EXE /D " Cobalt OS 1.2 Setup " /M "Creating restore point..."
-echo.
-echo  Please wait while the installer creates a restore point.
-echo.
-mkdir C:\SYSTEM\RESTORE\
-copy BASE.ZIP C:\SYSTEM\RESTORE\BASE.ZIP
-if exist C:\SYSTEM\DOSSHELL.EXE copy DESKTOP.ZIP C:\SYSTEM\RESTORE\DESKTOP.ZIP
+:finishsetup
+SUSCR.EXE /D " Cobalt OS 1.2 Setup " /M "Finishing installation..."
 RBPCI\PCICFG.EXE -t *|FIND.EXE "DeviceID BEEF" > nul
 if not errorlevel 1 goto vboxtxt
 goto complete
