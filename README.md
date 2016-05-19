@@ -20,7 +20,7 @@ Cobalt is open source under the GPLv3 license.
 
 ## Download Cobalt
 
-Cobalt 1.1 is available to download [here](https://github.com/corbindavenport/cobalt/releases/tag/1.1). Download the zip file, unzip it, and either burn the ISO to a disc or mount it in a virtual machine to run.
+Cobalt 1.2 is available to download [here](https://github.com/corbindavenport/cobalt/releases/tag/1.2). Download the zip file, unzip it, and either burn the ISO to a disc or mount it in a virtual machine to run.
 
 ### How to compile
 
@@ -37,7 +37,7 @@ There are two main packages in the installer. The first, `BASE.ZIP`, contains th
 ---------------------------------------------------------
 
 __New in Cobalt 1.2:__
-* VirtualBox is now officially suported
+* VirtualBox is now officially supported
 * Windows 3.0, 3.1, and 3.11 for Workgroups is now officially supported
 * The installer has been greatly improved, and you can now repair existing Cobalt installations
 * Now uses JEMMEX as the memory manager instead of Emm386 and Himem, resulting in better performance and lower RAM usage
