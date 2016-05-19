@@ -169,6 +169,8 @@ echo.
 CHOICE.EXE > nul
 if errorlevel 2 goto cancel
 SUSCR.EXE /D " Cobalt OS 1.2 Setup " /M "Renaming existing DOS files..."
+ATTRIB.COM -H C:\AUTOEXEC.BAT
+ATTRIB.COM -H C:\CONFIG.SYS
 COPY C:\CONFIG.SYS C:\CONFIG.OLD
 COPY C:\AUTOEXEC.BAT C:\AUTOEXEC.OLD
 DEL C:\CONFIG.SYS
