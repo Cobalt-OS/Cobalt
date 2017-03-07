@@ -1,4 +1,0 @@
-Known bugs that have not yet been fixed:
-
-- PXELINUX: Some PXE stacks fail with routing enabled, some with
-  routing disabled.  Try both?
