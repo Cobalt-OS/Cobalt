@@ -18,6 +18,29 @@ if exist MKISOFS.EXE (
     exit
 )
 
+:: check for 7za
+if exist 7ZA.EXE (
+    echo [ OK ] Mkisofs executable found in %DIR%
+) else (
+    echo [EROR] 7-Zip executable not found, please make sure it's in the same folder as this compiler.
+    pause
+    exit
+)
+
+:: compile base.zip
+if exist CDROOT\COBALT\BASE.ZIP (
+    del CDROOT\COBALT\BASE.ZIP
+    echo [ OK ] Deleting existing BASE.ZIP file.
+)
+7za a CDROOT\COBALT\BASE.ZIP BASE\*
+
+:: compile desktop.zip
+if exist CDROOT\COBALT\DESKTOP.ZIP (
+    del CDROOT\COBALT\DESKTOP.ZIP
+    echo [ OK ] Deleting existing DESKTOP.ZIP file.
+)
+7za a CDROOT\COBALT\DESKTOP.ZIP DESKTOP\*
+
 :: check for files
 
 if exist %FILE% (

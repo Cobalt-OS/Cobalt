@@ -1,0 +1,782 @@
+#
+#  Waterloo TCP/IP sample configuration file.
+#
+#  Use this file as a template to make your own.
+#  This file should be located in "current directory" or in a directory
+#  pointed to by the environment variable "WATTCP.CFG".
+#
+#  This file is searched in the following directories until found:
+#   1. via the environment variable "WATTCP.CFG".
+#   2. in the directory of the executing program (if DOS 3+ used).
+#   3. in the current directory.
+#
+#  E.g. Put a copy of this file in "c:\net\watt\bin" and insert this
+#       line in your AUTOEXEC.BAT (or %SystemRoot%\SYSTEM32\AUTOEXEC.NT):
+#
+#         SET WATTCP.CFG=C:\NET\WATT\BIN
+#
+#  Note 1: No trailing `\' at end of line, and no spaces around the `='.
+#
+#  Note 2: The order of keywords/value pairs are significant.
+#    For instance, if you have "134.121.10.8 my_dns" in your
+#    "c:\net\watt\bin\hosts" file, then "hosts = c:\net\watt\bin\hosts"
+#    MUST be listed before the line specifying your nameserver;
+#    "nameserver = my_dns".  The same rule applies to "gateway" and "cookie"
+#
+#  Note 3: the value (right of `=') is the default if you comment the
+#    line out. Comments starts with `#' or `;'. To use `#' or `;' inside
+#    string values, the string MUST be put in quotes.
+#    E.g. these keywords have different values:
+#      keyword1 = "hello world #;"
+#      keyword2 = "hello world "#;
+#
+#  Note 4: The right-side value may contain an environment variable that
+#    will be expanded when read. The effect is like in a Makefile.
+#    E.g. if environment variable "ETC" is "c:\net\watt\bin",
+#         "$(ETC)\hosts" becomes "c:\net\watt\bin\hosts" after
+#         expansion.  See "README.TOO" for details.
+#
+#  Note 5: Remember that all this text takes time to parse (especially on
+#    a 386 or older CPU). Cut down the contents of your "WATTCP.CFG" (not
+#    this file, a copy) to a minimum to improve speed.
+#
+#
+# Text printed to screen (stdout).
+#
+print = "Waterloo TCP/IP setup"   ; optional key/value
+
+#
+# What packet-driver vector to use. A value in range 0x60 - 0x80.
+# Default behaviour (value 0) is to search for first packet-driver vector
+# in range 0x60 - 0x80.
+#
+pkt.vector = 0   ; optional
+
+#
+# Number of retries if PKTDRVR transmit fails.
+# (total attempts are pkt.txretries+1).
+#
+pkt.txretries = 2   ; optional
+
+#
+# Set the packet-driver receive mode. Normally not needed, but experience
+# has shown that some drivers may have problem receving traffic needed for
+# e.g IPv6. Can also be handy for sniffing (rxmode = 6).
+# Only effective if Watt-32 was compiled with USE_MULTICAST or USE_IPV6.
+# These modes are supported:
+#
+#   1 = Turn receiver off (take care!)
+#   2 = Direct, receive only traffic to this PC
+#   3 = mode 2 + broadcast (default for IPv4)
+#   4 = mode 3 + limited multicast
+#   5 = mode 3 + all multicast (default for IPv6)
+#   6 = promiscous mode, receive all traffic
+#
+pkt.rxmode = 3   ; optional
+
+#
+# If using a fixed IP-address, insert the dotted decimal address below.
+# If your LAN has a DHCP server, use "my_ip = dhcp".
+# Likewise, if you want to get your IP-address via BOOTP or RARP servers.
+#
+my_ip = 0.0.0.0  ; mandatory
+
+#
+# The name of this host excluding the domain-name.
+# Note: may be overridden by DHCP/BOOTP server.
+#       Max 50 characters.
+#
+hostname = "random-pc" ; optional
+
+#
+# A better method would be to define it via the environment.
+# If djgpp is installed and you have the `uname' program, then use
+# $(COMPUTERNAME) if running under Windows for a consistent name here.
+#
+#hostname = $(COMPUTERNAME)
+
+#
+# The netmask specifying the sub-net you are on.
+# Note: may be overridden by DHCP/BOOTP server.
+#
+netmask = 255.255.255.0  ; mandatory if not using DHCP
+
+#
+# IP-address (or name) of DNS host(s). The DNS host's job is to
+# translate hostnames to IP-addresses if the hostname isn't listed
+# in "$(ETC)\hosts".
+#
+# Notes: DHCP/BOOTP servers may add additional nameservers to the one(s)
+#        you specify here.
+#        There are no default server.  There can be a total of 10
+#        nameservers. All nameserver are queried in sequence until an
+#        IP-address is returned. Enter the "fastest" (closest) nameserver
+#        first for best result.
+#
+# nameserver = 0.0.0.0  ; primary DNS, mandatory if not using DHCP
+# nameserver = 0.0.0.0  ; secondary DNS, optional
+
+#
+# The IP-address (or name) of your gateway.
+# If you are running DOS-PPP with EtherNet emulation this should be
+# replaced with $(REMIP). For SLIP or normal PPP, gateway is not used.
+#
+# The syntax is "ip-addr [,subnet [,mask]]"
+#
+# Notes: Will most likely be overridden by DHCP/BOOTP server.
+#        The ARP-routing table is limited to 8 gateways.
+#
+# gateway = 0.0.0.0  ; mandatory if not using BOOTP/DHCP
+
+#
+# The Internet Domain Name of your network (of which your subnet is
+# part of). The "Fully Qualified Domain Name" (FQDN) of your host is
+# hostname + domain_list. E.g. "random-pc.your.domain.com".
+#
+# Note: "domain_list" (or previously named "domainslist") is used by DNS
+#       to resolve "dot-less names" (i.e. no `.' in host-name) recursively.
+#       E.g. resolving "random-pc2" will query all DNS-servers for these
+#            names until an IP-address is found:
+#              "random-pc2.your.domain.com"
+#              "random-pc2.domain.com"
+#              "random-pc2.com"
+#              "random-pc2"
+#
+#       This behaviour can be turned off with "domain_recurse = 0"
+#       See below.
+#
+# Note: domain_list may be overridden by DHCP server.
+#       Max 50 characters.
+#
+domain_list = your.domain.com  ; mandatory if not using DHCP
+
+#
+# The old name for "domain_list". It has the same effect as
+# "domain_list". Don't use both versions.
+#
+# domainslist = your.domain.com  ; mandatory if not using DHCP
+
+#
+# The total time waiting for response (and including retransmissions)
+# from each DNS-host. The total host lookup time is <domain_to> *
+# <number of nameservers>.  A value <4*sockdelay> is used if not defined
+# (or if domain_to = 0).
+#
+domain_to = 0  ; optional
+
+#
+# Recursively resolve dot-less names. See above. If set to "0", only
+# requests for "name" is sent to DNS-servers.
+#
+domain_recurse = 1 ; optional
+
+#
+# If using a PPP-driver your hostname will normally be different each
+# time you're online. To query your true hostname set value below to 1.
+# The penalty for using this option is a small delay since your assigned
+# IP-address (MY_IP) must be reverse resolved into a Fully Qualified
+# Domain Name (FQDN).
+#
+# Note: The use of this option will cause any HOSTNAME or DOMAIN_LIST to
+#       be over-written. Any hostname or domainname coming from BOOTP or
+#       DHPC will also be over-written.
+#
+dynamic_host = 0  ; optional
+
+#
+# Used by the BSD-socket API and connect() function (and for DNS-lookups).
+# Default value is 30 sec.
+#
+sockdelay = 30  ; optional
+
+#
+# Inactivity timeout for TCP-sockets. A timer is started at reception
+# of a TCP-packet and checked at each tcp_tick().
+# Default value is 0 meaning no timeout.
+#
+inactive = 0  ; optional
+
+#
+# Data timeout for TCP-sockets. A timer is started when data is sent
+# and checked at each tcp_tick(). The socket is closed if timed out.
+# Default value is 120 (2min).
+#
+datatimeout = 120 ; optional
+
+#
+# Enable UDP/TCP-debug mode. Set to 1 (or 2 for more details) to print
+# information regarding the TCP state-machine or UDP errors etc.
+# Default value is 0.
+#
+debug = 0  ; optional
+
+#
+# Maximum Segment Size. The maximum size of each TCP-segment you are
+# willing to receive is specified here. The upper limit of MSS is 40
+# bytes less than the MRU (Maximum Receive Unit) of the link-layer.
+# 40 = size of IP+TCP headers.
+# E.g. 1460 for EtherNet or the MRU-40 for a PPP-driver.
+#
+# MSS is only used for TCP-sockets. The size of received
+# UDP-datagrams cannot be controlled, but is limited to 1472 (1500-28).
+#
+# Default value of MSS is 1460.
+#
+mss = 1460  ; optional
+
+#
+# Maximum Transmission Units. The maximum size of any packet sent
+# to the link-layer. Note: This value may be overridden by value
+# returned by PKTDRVR (if driver is an extended driver).
+#
+# Default (and upper-bound) value is 1500.
+#
+mtu = 1500  ; optional
+
+#
+# Path MTU discovery on opening TCP connections (ref. RFC1323)
+# Not implemented yet, hence no effect.
+#
+tcp.mtu_discovery = 0  ; optional
+
+#
+# Enable "Path MTU Black-hole detection" (ref. RFC1323)
+# Not implemented yet, hence no effect.
+#
+tcp.blackhole_detect = 0  ; optional
+
+#
+# Sending an "ICMP Mask Request" message after startup may help isolate
+# problems caused by setting wrong netmask (see above).
+# The ICMP message is sent as link-layer broadcast and destination IP
+# 255.255.255.255.
+# There must be a host on the subnet that can answer this ICMP request.
+# A warning ("Conflicting net-mask from ICMP Addr Mask Reply") is printed
+# if the 2 netmasks differ.  Refer RFC-950 for details.
+#
+icmp_mask_req = 0  ; optional
+
+#
+# IP-address (or name) of cookie server(s) used by the COOKIE program.
+# Most WinNT servers have cookie jars (allthough dull quotes).
+# No default.
+#
+# cookie = 0.0.0.0 ; optional
+
+#
+# "ETC" is an environment variable that should point to your Waterloo
+# bin-directory.
+#
+# File specifying the language translations for all strings internal
+# to Waterloo.  Only German (de), Norwegian (no) and Swedish (se)
+# translations are included at the moment.  The WATLANG.TXT file is
+# very incomplete at this moment, so the effective language is English (en).
+#
+language = en,$(ETC)\watlang.txt
+
+#
+# File specifying the list of <host-names> to <IPv4-address> mappings.
+# This file is queried before any DNS-host is queried.
+# Note: Windows users may use the `hosts' file of the system.
+#       On Win95/98/ME use `hosts = $(WINDIR)\system\hosts'
+#       On WinNT/2K/XP use `hosts = $(WINDIR)\system32\drivers\etc\hosts'
+#
+# Same note applies to the `services', `protocol' and `networks' files.
+#
+# There can be several hosts files; simply insert several "hosts = file"
+# lines below this line.
+#
+hosts = $(ETC)\hosts  ; optional
+
+#
+# File specifying the list of <service-name> to <protocol> mappings.
+# This file is used by the <netdb.h> functions (getservbyname() etc).
+#
+services = $(ETC)\services  ; optional
+
+#
+# File specifying the list of <IP-protocol-name> to <IP-protocol-numbers>
+# mappings. This file is used by the <netdb.h> functions (getprotobyname()
+# etc).
+#
+# Note: this file should NOT be named `protocols' to avoid problems under
+#       Win95/98 and targets supporting long file-names (e.g. djgpp)
+#
+protocols = $(ETC)\protocol  ; optional
+
+#
+# File specifying the list of <network-numers> to <domain-names>
+# mappings. This file is used by the <netdb.h> functions (getnetbyname() etc).
+#
+networks = $(ETC)\networks  ; optional
+
+#
+# File specifying the list of <ether-address> to <host-names> mappings.
+# Similar function as "ethip" keyword below (static ARP cache) except that
+# ethers-file uses hostnames or IP addresses. If using hostnames there
+# should be a <ip-address> mapping defined in the "$(ETC)\hosts" file.
+#
+# Note: The "$(ETC)\ethers" file is only effective if library was compiled
+#       with `USE_ETHERS' (default off, ref. .\src\config.h).  File is read
+#       and parsed after all other configurable options have been read.
+#
+ethers = $(ETC)\ethers  ; optional
+
+#
+# Measure execution speed for certain Watt-32 functions. Only effective
+# for 32-bit djgpp, Watcom, DMC and HighC programs running on Pentium
+# (the RDTSC instruction is used). Results are written to file WATTCP.PRO
+# in current directory.
+#
+profile = 0  ; optional
+
+#
+# Watt-32 DHCP configuration
+#
+# DHCP server address (broadcast)
+#
+dhcp.host = 0.0.0.0    
+
+#
+# Enable DHCP trace messages
+#
+dhcp.trace = 0 
+
+#
+# broadcast flag for older DHCP daemons (or WinNT)
+#
+dhcp.bcast = 0
+
+#
+# timeout while waiting for DHCP offer
+#
+dhcp.timeout = 10   
+
+#
+# Number of DHCP discover retries
+#
+dhcp.retries = 3
+
+#
+# Do an ARP Request on own IP (gratuitous ARP) after DHCP
+# finishes.
+#
+dhcp.arpcheck = 0    
+
+#
+# The file for storing transient configuration.
+# Use NUL to disable storing configuration.
+#
+dhcp.config = $(TEMP)\W32DHCP.TMP
+
+#
+#
+#
+dhcp.req_list = 3,6,8,9,12,15,19,20,23,26,35,36,37,38
+
+#
+#
+#
+dhcp.userclass = value1,value2   ; see RFC-3004
+
+#
+#
+#
+dhcp.vendclass = "Watt-32"   ; RFC-2132, option 60
+
+#
+# IPv6 configuration
+#
+# The address of this machine. No `multihomes' are supported here (as
+# in the IPv4 "my_ip" address). Default address is ::FFFF:my_ip.
+#
+ip6.my_ip = ::FFFF:$(MY_IP)  ; mandatory
+
+#
+# File specifying the list of <host-names> to <IPv6-address> mappings.
+# This file is queried before any DNS-host is queried.
+#
+# There can be several hosts files; simply insert several "ip6.hosts = file"
+# lines below this line. The "hosts" file is *not* used for IPv6 addresses.
+#
+ip6.hosts6 = $(ETC)\hosts6
+
+#
+# Use the RDTSC instructions for high-resolution timer calculations.
+# If 0, use the 8254 timer chip. Default is 1 if a Pentium type processor
+# is detected.
+#
+# Note: Under a multitasking OS (Window), it's virtually impossiple to
+#       detect if the RDTSC instruction has been disabled (bit2=1 in CR4
+#       register). So if timers doesn't seem to work on a CPU with RDTSC,
+#       set this value to "0".
+#
+# This setting is NOT EFFECTIVE YET. Use an environment variable
+# "USE_RDTSC=0" to disable use of RDTSC instruction.
+#
+use_rdtsc = 1   ; optional
+
+
+#########################################################################
+#########                                                       #########
+#########  EVERYTHING BELOW THIS LINE IS FOR ADVANCED USE ONLY  #########
+#########                                                       #########
+#########################################################################
+
+#
+# multihomes     = 0                         ; uses MY_IP - MY_IP+n
+# ethip          = <ether-addr1>, <ip-addr1> ; static ARP-table
+# ethip          = <ether-addr2>, <ip-addr2> ;
+# ethip          = <ether-addr3>, <ip-addr3> ;
+# eaddr          = <ether-addr>              ; sets my ether-address
+# bootp          = 255.255.255.255           ; BOOTP host address
+# bootp_to       = 30                        ; BOOTP timeout
+
+# redirects      = tcp,udp,icmp,igmp   ; honour ICMP redirects (0 disables)
+# netdb_alive    = 900                 ; cache-timeout for resolve   (def 15 min)
+
+# arp.timeout    = 2                   ; ARP resolver timeout        (def 2 sec)
+# arp.alive      = 300                 ; ARP life for cached entries (def 5 min)
+# arp.num_cache  = 64                  ; max # of entries in ARP cache (not yet)
+
+# ip.def_ttl     = 254                 ; default "Time To Live" for IP
+# ip.def_tos     = 0                   ; default "Type Of Service" for IP
+# ip.id_incr     = 1                   ; default increment of IP identifiers
+# ip.frag_reasm  = 15                  ; default fragment reassembly time (sec)
+
+# tcp.nagle      = 1                   ; TCP Nagle algorithm
+# tcp.opt.ts     = 0                   ; use TCP TimeStamp option
+# tcp.opt.sack   = 0                   ; use TCP Selective ACK options
+# tcp.opt.wscale = 0                   ; use TCP Window scale option
+
+# tcp.timer.open_to   = 1000           ; TCP open timer value
+# tcp.timer.close_to  = 1000           ; TCP close timer value
+# tcp.timer.rto_add   = 100            ; added value in RTO calculation
+# tcp.timer.rto_base  = 10             ; base RTO value
+# tcp.timer.rto_scale = 64             ; scaling factor for delayed ACKs
+# tcp.timer.reset_to  = 100            ; time for sending RST
+# tcp.timer.retran_to = 50             ; time for doing retransmits
+
+# include = ?$(ETC)\pppd.cfg           ; PPP configuration
+# include = ?$(ETC)\pppoe.cfg          ; PPPoE configuration
+# include = ?$(ETC)\slip.cfg           ; SLIP configuration
+# include = ?$(ETC)\rpc.cfg            ; RPC configuration
+# include = ?$(ETC)\smb.cfg            ; SMB/RFC-NetBios configuration
+
+#
+# Protocol debugging stuff (not related to "debug" above).
+#
+# Activated by calling dbug_init() before calling sock_init()
+# from application. Only effective if library was built with USE_DEBUG.
+# See "README.TOO" for details.
+#
+# Name of debug file ("con", "stdout" or "stderr" for console, "nul" for
+# NULL-device). Put on RAM-disk for best performance.
+#
+debug.file = wattcp.dbg  ; optional
+      
+#
+# Don't show packets not destined for us or not generated by us.
+# A combination of these values can be specified:
+#
+#  ETH   -> discard link-layer packets (for EtherNet/TokenRing only)
+#  ARP   -> discard ARP packets        (for EtherNet/TokenRing only)
+#  RARP  -> discard RARP packets       (for EtherNet/TokenRing only)
+#  IP    -> discard IP packets         (for EtherNet/TokenRing/PPP/SLIP)
+#  BCAST -> discard link-layer broadcast or IP-broadcast
+#  MCAST -> discard link-layer multicast
+#  ALL   -> discard everything not to/from us.
+#  NONE  -> show all packets received.
+#
+# Note: ETH is also used for Token-Ring meaning MAC header
+#
+debug.filter = all
+
+#
+# Which protocols (headers and data) to debug.  A combination of
+# these values can be specified:
+#  ETH, LLC, ARP, RARP, IP, UDP, TCP, ICMP, IGMP or ALL.
+#
+# Note: ETH is also used for Token-Ring meaning MAC header.
+#
+debug.proto = arp/rarp/ip/udp/tcp/icmp/igmp
+
+#
+# What part of a packet to dump;
+#  HEADER -> dump only protocol headers. E.g. UDP-head without data part.
+#  ALL    -> both header and ascii/binary data-dump.
+#
+debug.mode = all
+
+#
+# Dump values of statistics counters at program exit.
+# I.e. packets received/transmitted to debug.file.
+#
+debug.stat = 1  ; optional
+
+#
+# Dump details of DNS request/response packets on UDP port 53.
+# Only effective if pcdbug.c was compiled with DEBUG_DNS=1.
+#
+debug.dns = 1  ; default is 1
+
+#
+# Dump details of RTP/RTCP udp packets. NOT USED YET.
+# Only effective if pcdbug.c was compiled with DEBUG_RTP=1.
+#
+debug.rtp = 1  ; default is 1
+
+##
+## Socket-layer debugging stuff. Only used by BSD-socket API.
+## Activated by calling dbug_init() before calling sock_init()
+## from application.
+##
+#
+# where to print socket-debug;
+#   <file>, "con", "stdout", "stderr" or "nul". No default.
+#
+# As with "debug.file", put on RAM-disk for best performance.
+#
+sk_debug.device = wattcp.sk
+
+#
+# C-style open mode for the "sk_debug.device".
+#  "w+" write (and create if not exists)
+#  "a"  append to file
+#  "t"  "sk_debug.device" is a text-file.
+#
+sk_debug.openmode = w+  ; default
+
+#
+# Service-order for DNS name lookups. Use `hosts' first. If name not
+# in `hosts' file send a DNS request to nameserver(s).
+# NOT YET IMPLEMENTED; order is always "hosts,bind".
+# For IPv6, order is always "hosts6, bind6, hosts, bind".
+#
+# host.conf = order hosts, bind
+
+#
+# Configuration of bind resolver. These settings are active only if
+# library was compiled with USE_BIND (ref. .\src\config.h) and using
+# any of the resolver functions in <resolv.h>.
+#
+# HOSTALIASES points to a file which lists host aliases, e.g:
+#  alfie.somewhere.net www.somewhere.net
+#  blondie.foo.net     mail.mci.net
+#
+# Default value is taken from environment variable "HOSTALIASES".
+#
+bind.hostaliases = $(HOSTALIASES)  ; optional
+
+#
+# Options used for initialising the resolver. The value(s) are:
+#   ndots:n  -> n specifies # of dots '.' in a domain (default 1).
+#   debug    -> enable resolver debug mode.
+#
+# E.g. "bind.res_options = ndots:4 debug".
+# See also manpage for "bind".
+#
+# Default value is taken from environment variable "RES_OPTIONS".
+#
+bind.res_options = $(RES_OPTIONS)  ; optional
+
+#
+# Allow the following hosts to connect to our TCP listening sockets.
+# Use comma-separated list for single hosts or regexp for multiple hosts.
+# Ranges can be specified using "network/mask" notation. E.g.
+#   "tcpd.hosts.allow = 133.212/16" will allow the hosts in range
+# 133.212.0.0 - 133.212.255.255.
+# NOT YET IMPLEMENTED; all hosts are allowed.
+#
+# tcpd.hosts.allow = *
+
+#
+# Deny the following hosts to connect to our TCP listening sockets.
+# Use comma-separated list for single hosts or regexp for multiple hosts.
+# Ranges can be specified using "network/mask" notation. See above.
+# NOT YET IMPLEMENTED; only the broadcast and null-addresses are denied.
+#
+# tcpd.hosts.deny = 255.255.255.255, 0.0.0.0
+
+#
+# Simple syslog client configuration. Sends log messages to file and/or
+# a logging host. Protocol used is UDP (unicast or broadcast).
+#
+# Messages are appended to file. Default filename is extracted from
+# path and name of running application.
+#
+syslog.file = ; optional
+
+#
+# Which host to send logging messages to. If not specified here, it may
+# be received via BOOTP or DHCP (if specified by "my_ip = dhcp", or
+# "wattcp.cfg file is not found). The host MUST be a name listed in
+# "$(ETC)\hosts" or a dotted IP-address. You can also specify a broadcast
+# IP-address and hope the messages are picked up by a logging daemon.
+#
+syslog.host = ; optional
+
+#
+# Which UDP destination port to send to. Default is 514.
+# The port is first searched in "$(ETC)\services". The line should be
+# "syslog 514/udp". If not found there, the following port is used.
+# i.e. the following line is overruled by "syslog port/udp" in
+#     "$(ETC)\services".
+#
+syslog.port = 514  ; optional
+
+#
+# What syslog messages shall be written to file and/or sent to logging host.
+#
+# A combination of the following may be specified (<sys/syslog.h> flags):
+#  emerg   => system is unusable                  (LOG_EMERG)
+#  alert   => action must be taken immediately    (LOG_ALERT)
+#  crit    => critical conditions                 (LOG_CRIT)
+#  error   => error conditions                    (LOG_ERR)
+#  warning => warning conditions                  (LOG_WARNING)
+#  notice  => normal but significant condition    (LOG_NOTICE)
+#  info    => informational                       (LOG_INFO)
+#  debug   => debug-level messages                (LOG_DEBUG)
+#  all     => all combinations above.
+#
+# Default level is "emerg/alert/error"
+#
+syslog.level = emerg/alert/error  ; optional
+
+#
+# TFTP client configuration.
+#
+# To actually enable loading of `tftp.boot_file' via TFTP protocol,
+# the application must supply a "writer" hook through function pointer
+# `tftp_writer'. See <tcp.h> or .\src\tftp.c.
+#
+# The TFTP client uses UDP on port 69 (unless specified differently in
+# $(ETC)\services).
+#
+# Note: When using DHCP (TFTP options and BOOTP not supported), the
+#       "tftp.boot_file" and "tftp.server" specified below *may* be
+#       overridden by the DHCP-server. This is because a properly
+#       configured DHCP-server should know what's best for you...
+#
+# Specify what file to load. This file may be present in an option
+# coming from DHCP-server, but can be specified here.
+#
+# Note: remote file-name is server's file-name (relative to it's virtual
+#       root) and may contain a path. It's the responsibility of the
+#       application to map server's boot filename into your local file
+#       system or create any missing directories.
+#
+# The format of "tftp.boot_file" is "remote name" optionally followed by a
+# local name. E.g. "tftp.boot_file = /tftpd/bootp.file $(TEMP)\bootp.fil"
+#
+# Note: The remote/local filenames cannot contain any spaces or tabs.
+#
+tftp.boot_file = ; optional
+
+#
+# Specify what server (dotted ip-address or host from `hosts' file) to
+# get TFTP.BOOT_FILE from. If not specified here, TFTP-server name MUST
+# be given by DHCP server.
+#
+tftp.server = ; optional
+
+#
+# Specify timeout (in seconds) waiting for each packet from TFTP-server.
+#
+tftp.timeout = 8 ; optional
+
+#
+# Specify retry count waiting for packets from TFTP-server.
+#
+tftp.retry = 5 ; optional
+
+#
+# C-style open mode for the local file "tftp.boot_file".
+# Specify "wt" to transfer a text file from a Unix-based TFTP server.
+#
+tftp.openmode = "wb"  ; default
+
+#
+# Specify transfer mode for retrieval. Either use "octet" (default) for
+# 8-bit raw data, "netascii" or "mail". Ref. RFC-1350.
+#
+# Note: Some tftp servers (e.g. PumpKIN) ignores this mode.
+#
+tftp.mode = "octet" ; optional
+
+#
+# Specify local port to use. Default behaviour (0) is to select a random
+# local port in range 1024 - 65535. If e.g. a firewall makes this
+# difficult, use a fixed port above 1024.
+#
+tftp.port = 0 ; optional
+
+#
+# ECHO/DISCARD daemons
+#
+echo.daemon    = 0                 ; active echo service
+echo.host      = 255.255.255.255   ; accept from anybody
+echo.port      = 7                 ; listen on port 7
+
+discard.daemon = 0                 ; active discard service
+discard.host   = 255.255.255.255   ; accept from anybody
+discard.port   = 9                 ; listen on port 9
+
+
+#######################################################################
+########                                                       ########
+########   CONFIGURATION FOR VARIOUS WatTCP/Watt-32 PROGRAMS   ########
+########                                                       ########
+#######################################################################
+#
+# For details regarding these settings refer the documentation
+# of respective programs.
+#
+# HTget by Ken Yap (ken@syd.dit.csiro.au)
+#
+http.proxy = <your.http.proxy>:<port>  ; no default
+
+#
+# Michael Ringe's TALK client/server
+#
+talk.localuser  = <your signature/handle>
+talk.screenmode = autocr,split
+talk.colors     = 1E,1A,71,71,71
+talk.alias      = joe:joe@some.domain.com
+talk.logfile    = $(WATTCP.CFG)\talk\talk.log
+talk.message    = "%s is busy. Try again later.\n"
+
+#
+# SNUZ nntp client by
+# Doug McDonald (mcdonald@aries.scs.uiuc.edu)
+#
+snuz.tmpdir = $(TEMP)
+snuz.rc     = $(ETC)\news\snuz.rc      ; list of subscribed groups, etc
+snuz.active = $(ETC)\news\active       ; list of all groups
+snuz.host   = news.server.com          ; news server ipaddr
+snuz.from   = joe@some.domain.com      ; the user's email-address
+snuz.editor = edit.exe                 ; editor for writing posts
+snuz.smtp   = "popmail send %H %D %f"  ; external sendmail program
+
+#
+# SMB Printer daemon 0.94 by
+# Ken Yap (ken@syd.dit.csiro.au)
+#
+smbpd.workgroup    = "my-work-group"
+smbpd.printer1name = "my-printer-at-lpt1"
+smbpd.printer2name = "my-printer-at-lpt2"
+smbpd.printer3name = "my-printer-at-lpt3"
+
+#
+# Erick Engelke's SMTP-server
+#
+smtp.subdir   = $(ETC)\smtpd\mail\  ; sub-dir for mail/temp files, must exist
+smtp.sessions = 8                   ; # of SMTP sessions
+
+#
+# UCD-SNMP library
+#
+snmp.mibfile  = $(snmp)\mib.txt
+snmp.mib2file = $(snmp)\mib-v2.txt
+
+
