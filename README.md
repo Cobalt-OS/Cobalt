@@ -40,7 +40,7 @@ If Mkisofs is not installed on your system, the compile script will use the bina
 
 On boot of the .iso image (or whatever media it was burned to), isolinux is loaded. It then mounts the floppy image located at `cdroot/isolinux/BTDISK.IMG`. The floppy image loads a base FreeDOS 1.1 system and enough drivers to mount the entire CD partition (the `cdroot` folder), sets it to the D:\ drive, and runs the AUTORUN.BAT file within `cdroot`.
 
-There are two main packages in the installer. The first, `BASE.ZIP`, contains the base Cobalt OS without a desktop. The second package, `DESKTOP.ZIP`, includes the optional FreeDOS Shell package. Both of these packages are zipped from the BASE and DESKTOP folders when the compile script is run.
+There are two main packages in the installer. The first, `BASE.ZIP`, contains the base Cobalt OS without a desktop. The second package, `DESKTOP.ZIP`, includes the optional FreeDOS Shell package. Both of these packages are zipped from the base and desktop folders (found in the packages folder) when the compile script is run.
 
 ---------------------------------------------------------
 
