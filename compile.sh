@@ -3,7 +3,7 @@
 NAME="Corbin Davenport"
 PUBLISHER="Cobalt"
 TITLE="Cobalt Live CD"
-FILE="COBALT.ISO"
+FILE="cobalt.iso"
 DIR="$(dirname "$0")"
 
 # make sure mkisofs is executable
@@ -38,7 +38,7 @@ else
 fi
 
 # check for zip command
-if [ -x "$(command -v mkisofs)" ]; then
+if [ -x "$(command -v zip)" ]; then
 	echo "[ OK ] ZIP command found"
 else
 	echo "[EROR] ZIP command could not be found. Please install zip first"
@@ -50,9 +50,9 @@ if [ -f CDROOT/COBALT/BASE.ZIP ]; then
 	rm CDROOT/COBALT/BASE.ZIP
 	echo "[ OK ] Deleted existing BASE.ZIP"
 fi
-cd BASE
-zip -q -r ../CDROOT/COBALT/BASE.ZIP *
-cd ../
+cd packages/base
+zip -q -r ../../CDROOT/COBALT/BASE.ZIP *
+cd ../../
 echo "[ OK ] Finished compiling BASE.ZIP"
 
 # compile DESKTOP.ZIP file
@@ -60,9 +60,9 @@ if [ -f CDROOT/COBALT/DESKTOP.ZIP ]; then
 	rm CDROOT/COBALT/DESKTOP.ZIP
 	echo "[ OK ] Deleted existing DESKTOP.ZIP"
 fi
-cd DESKTOP
-zip -q -r ../CDROOT/COBALT/DESKTOP.ZIP *
-cd ../
+cd packages/desktop
+zip -q -r ../../CDROOT/COBALT/DESKTOP.ZIP *
+cd ../../
 echo "[ OK ] Finished compiling DESKTOP.ZIP file"
 
 # check for ISO file
