@@ -1,3 +1,6 @@
+:: This is the Cobalt autoexec.bat file, used for startup
+:: programs and tasks. If you want to add custom commands,
+:: add them to the very bottom of this file.
 @ECHO OFF
 SET BLASTER=A220 I5 D1 H5 P330 T6
 PATH \SYSTEM\BIN
@@ -11,7 +14,6 @@ LH \SYSTEM\DRV\CD\SHSUCDX /D:CD
 LH \SYSTEM\DRV\BLACKOUT.EXE
 if exist \SYSTEM\VBOX.TXT goto vbox
 if exist \WINDOWS\SYSTEM\DOSX.EXE goto windowsinfo
-if exist \SYSTEM\DOSSHELL.EXE goto desktop
 goto end
 
 :vbox
@@ -19,17 +21,7 @@ LH \SYSTEM\BIN\PCNTPK INT=0x60
 SET MTCPCFG=\SYSTEM\NET\MTCPCFG.TXT
 LH \SYSTEM\BIN\DHCP
 if exist \WINDOWS\SYSTEM\DOSX.EXE goto windowsinfo
-if exist \SYSTEM\DOSSHELL.EXE goto desktop
 goto end
-
-:desktop
-cls
-LH \SYSTEM\DOSSHELL.EXE
-echo.
-echo  Cobalt is shutting down...
-echo.
-echo.
-LH \SYSTEM\BIN\FDAPM.COM POWEROFF
 
 :windowsinfo
 if exist \SYSTEM\WININFO.TXT goto end
@@ -53,5 +45,5 @@ echo.
 echo Welcome to Cobalt.
 echo Type HELP for available commands.
 if exist \WINDOWS\SYSTEM\DOSX.EXE echo Type RUNWIN to run Windows.
+if exist \GEM.BAT echo Type GEM to start the OpenGEM Desktop.
 echo.
-exit

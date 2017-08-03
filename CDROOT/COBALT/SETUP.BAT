@@ -205,9 +205,10 @@ goto askdesktop
 :askdesktop
 SUSCR.EXE /D " Cobalt OS 1.3 Setup " /M "Install desktop?" /F "Y/N?"
 echo.
-echo  You can optionally install a graphical file manager, called
-echo  FreeDOS Shell, so you don't have to use the command line at
-echo  all.
+echo  You can optionally install a desktop environment, called
+echo  OpenGEM, so you don't have to use the command line. After
+echo  Cobalt boots up, you can just type "GEM" and press ENTER
+echo  to start the desktop.
 echo.
 echo  Press Y to install the desktop, or N to skip this step.
 echo.
