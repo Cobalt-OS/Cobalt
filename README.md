@@ -9,12 +9,12 @@ Cobalt is still in development, so you might encounter bugs. It currently includ
 
  * [4DOS 8.00](https://en.wikipedia.org/wiki/4DOS) command line
  * FAT12/16/32 file system support
- * Optional [graphical file manager](http://www.webring.org/l/rd?ring=freedos;id=14;url=http%3A%2F%2Ffdshell%2Esourceforge%2Enet%2F)
+ * Optional [OpenGEM desktop environment](http://www.opendawn.com/opengem/)
  * Silent boot
  * Support for CD/DVD drives
  * Support for [Long file names](https://en.wikipedia.org/wiki/Long_filename)
 
-If you have an existing computer (or virtual machine) with a DOS-based operating system, Cobalt will allow you to 'upgrade' over the existing OS.
+If you have an existing computer (or virtual machine) with a DOS-based operating system, Cobalt will allow you to 'upgrade' over the existing OS and keep all your files.
 
 ### Download Cobalt
 
@@ -22,7 +22,7 @@ Cobalt 1.2 is available to download [here](https://github.com/corbindavenport/co
 
 ### How to compile
 
-Cobalt is easy to compile into a bootable .iso file. First, make sure you have the entire repo downloaded. If you are on Windows, just run the `compile.bat` file. If you are using Linux or Mac, run the `compile.sh` file. On Linux/Mac you may have to mark it as executable first, with `chmod +x ./compile.sh`.
+Cobalt is easy to compile into a bootable .iso file. First, make sure you have the entire repo downloaded/cloned. If you are on Windows, just run the `compile.bat` file. If you are using Linux or Mac, run the `compile.sh` file. On Linux/Mac you may have to mark it as executable first, with `chmod +x ./compile.sh`.
 
 When the script is done, it will create a `cobalt.iso` file within the main folder. Simply burn that image using any tool you like to a CD/DVD, or mount it into a virtual machine to try out Carbon.
 
@@ -45,6 +45,7 @@ There are two main packages in the installer. The first, `BASE.ZIP`, contains th
 ---------------------------------------------------------
 
 __New in Cobalt 1.3:__
+* OpenGEM has replaced FreeDOS Shell as the desktop environment
 * Now under the MIT license
 * Bash compiler now supports Debian
 * BASE and DESKTOP packages are now zipped during the compilation process

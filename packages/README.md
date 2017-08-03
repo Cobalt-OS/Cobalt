@@ -9,4 +9,4 @@ These are packages used by the Cobalt installer. They are compressed into ZIP fi
 
 ### Desktop
 
-'Desktop' only contains the [FreeDOS Shell](http://www.webring.org/l/rd?ring=freedos;id=14;url=http%3A%2F%2Ffdshell%2Esourceforge%2Enet%2F).
+'Desktop' only contains the [OpenGEM](https://github.com/shanecoughlan/OpenGEM) 7 RC3 desktop.
