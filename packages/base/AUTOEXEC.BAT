@@ -7,19 +7,15 @@ PATH \SYSTEM\BIN
 LH \SYSTEM\DRV\CTMOUSE.EXE
 LH \SYSTEM\DRV\DOSLFN\DOSLFN.COM
 LH \SYSTEM\BIN\FDAPM.COM APMDOS
-ATTRIB +H \AUTOEXEC.BAT
-ATTRIB +H \CONFIG.SYS
-ATTRIB +H \KERNEL.SYS
 LH \SYSTEM\DRV\CD\SHSUCDX /D:CD
-LH \SYSTEM\DRV\BLACKOUT.EXE
 if exist \SYSTEM\VBOX.TXT goto vbox
 if exist \WINDOWS\SYSTEM\DOSX.EXE goto windowsinfo
 goto end
 
 :vbox
 LH \SYSTEM\BIN\PCNTPK INT=0x60
+LH \SYSTEM\BIN\DHCP -retries 10
 SET MTCPCFG=\SYSTEM\NET\MTCPCFG.TXT
-LH \SYSTEM\BIN\DHCP
 if exist \WINDOWS\SYSTEM\DOSX.EXE goto windowsinfo
 goto end
 
@@ -44,6 +40,7 @@ cls
 echo.
 echo Welcome to Cobalt.
 echo Type HELP for available commands.
+if exist \SYSTEM\VBOX.TXT echo Type FTPSRV to start the FTP server.
 if exist \WINDOWS\SYSTEM\DOSX.EXE echo Type RUNWIN to run Windows.
 if exist \GEM.BAT echo Type GEM to start the OpenGEM Desktop.
 echo.

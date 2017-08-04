@@ -65,6 +65,16 @@ zip -q -r ../../CDROOT/COBALT/DESKTOP.ZIP *
 cd ../../
 echo "[ OK ] Finished compiling DESKTOP.ZIP file"
 
+# compile VBOX.ZIP file
+if [ -f CDROOT/COBALT/VBOX.ZIP ]; then
+	rm CDROOT/COBALT/VBOX.ZIP
+	echo "[ OK ] Deleted existing VBOX.ZIP"
+fi
+cd packages/virtualbox
+zip -q -r ../../CDROOT/COBALT/VBOX.ZIP *
+cd ../../
+echo "[ OK ] Finished compiling VBOX.ZIP file"
+
 # check for ISO file
 if [ -f "$FILE" ]; then
 	rm "$FILE"

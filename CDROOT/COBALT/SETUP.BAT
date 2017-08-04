@@ -142,14 +142,14 @@ CHOICE.EXE > nul
 if errorlevel 2 goto cancel
 SUSCR.EXE /D " Cobalt OS 1.3 Setup " /M "Deleting previous Cobalt installation..."
 DELTREE.COM /Y /Z:SERIOUSLY C:\SYSTEM
-SUSCR.EXE /D " Cobalt OS Repair " /M "Removing hidden flags on system files..."
+SUSCR.EXE /D " Cobalt OS Repair " /M "Removing hidden flags on system files (if applicable)..."
 ATTRIB.COM -H C:\AUTOEXEC.BAT
 ATTRIB.COM -H C:\CONFIG.SYS
 ATTRIB.COM -H C:\KERNEL.SYS
 SUSCR.EXE /D " Cobalt OS 1.3 Setup " /M "Installing base DOS system..."
 SYS.COM A: C:
 SUSCR.EXE /D " Cobalt OS 1.3 Setup " /M "Decompressing BASE.ZIP..."
-UNZIP.exe -o -q BASE.ZIP -d c:\
+UNZIP.exe -o BASE.ZIP -d c:\
 if not errorlevel 0 goto error
 del c:\COMMAND.COM
 goto askdesktop
@@ -178,7 +178,7 @@ DEL C:\AUTOEXEC.BAT
 SUSCR.EXE /D " Cobalt OS 1.3 Setup " /M "Installing base DOS system..."
 SYS.COM A: C:
 SUSCR.EXE /D " Cobalt OS 1.3 Setup " /M "Decompressing BASE.ZIP..."
-UNZIP.exe -o -q BASE.ZIP -d c:\
+UNZIP.exe -o BASE.ZIP -d c:\
 if not errorlevel 0 goto error
 del c:\COMMAND.COM
 goto askdesktop
@@ -197,7 +197,7 @@ SUSCR.EXE /D " Cobalt OS 1.3 Setup " /M "Copying base system files..."
 FORMAT.EXE c: /z:seriously /v:COBALT /s /y
 if not errorlevel 0 goto error
 SUSCR.EXE /D " Cobalt OS 1.3 Setup " /M "Decompressing BASE.ZIP..."
-UNZIP.exe -o -q BASE.ZIP -d c:\
+UNZIP.exe -o BASE.ZIP -d c:\
 if not errorlevel 0 goto error
 del c:\COMMAND.COM
 goto askdesktop
@@ -213,23 +213,38 @@ echo.
 echo  Press Y to install the desktop, or N to skip this step.
 echo.
 CHOICE.EXE > nul
-if errorlevel 2 goto finishsetup
+if errorlevel 2 goto detectvbox
 if not errorlevel 2 goto installdesktop
 
 :installdesktop
 SUSCR.EXE /D " Cobalt OS 1.3 Setup " /M "Decompressing DESKTOP.ZIP..."
-UNZIP.exe -o -q DESKTOP.ZIP -d c:\
+UNZIP.exe -o DESKTOP.ZIP -d c:\
 if not errorlevel 0 goto error
-goto finishsetup
+goto detectvbox
 
-:finishsetup
-SUSCR.EXE /D " Cobalt OS 1.3 Setup " /M "Finishing installation..."
+:detectvbox
+SUSCR.EXE /D " Cobalt OS 1.3 Setup " /M "Detecting system..."
 RBPCI\PCICFG.EXE -t *|FIND.EXE "DeviceID BEEF" > nul
-if not errorlevel 1 goto vboxtxt
+if not errorlevel 1 goto askvbox
 goto complete
 
-:vboxtxt
-echo A > C:\SYSTEM\VBOX.TXT
+:askvbox
+SUSCR.EXE /D " Cobalt OS 1.3 Setup " /M "Install VirtualBox add-ons?" /F "Y/N?"
+echo.
+echo  Since you're running Cobalt on VirtualBox, you can optionally
+echo  install networking support. This allows you to type in "FTPSRV"
+echo  at any time to share files between your host operating system
+echo  and Cobalt. This is especially useful for installing software.
+echo.
+echo  Press Y to install the Virtualbox add-ons, or N to skip this step.
+echo.
+CHOICE.EXE > nul
+if errorlevel 2 goto complete
+if not errorlevel 2 goto installvbox
+
+:installvbox
+SUSCR.EXE /D " Cobalt OS 1.3 Setup " /M "Decompressing VBOX.ZIP..."
+UNZIP.exe -o VBOX.ZIP -d c:\
 goto complete
 
 :complete

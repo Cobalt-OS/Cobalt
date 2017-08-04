@@ -1,0 +1,1 @@
+This file is used by AUTOEXEC.BAT to check if the VirtualBox add-on package is installed. Please do not delete this file.

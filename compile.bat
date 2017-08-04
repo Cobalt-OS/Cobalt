@@ -3,7 +3,7 @@
 SET NAME=Corbin Davenport
 SET PUBLISHER=Cobalt
 SET TITLE=Cobalt Live CD
-SET FILE=COBALT.ISO
+SET FILE=cobalt.iso
 SET DIR=%~dp0
 
 CD %DIR%
@@ -43,6 +43,15 @@ if exist CDROOT\COBALT\DESKTOP.ZIP (
 )
 cd packages\desktop
 ..\..\7za a ..\..\CDROOT\COBALT\DESKTOP.ZIP *
+cd ..\..\
+
+:: compile vbox.zip
+if exist CDROOT\COBALT\VBOX.ZIP (
+    del CDROOT\COBALT\VBOX.ZIP
+    echo [ OK ] Deleting existing VBOX.ZIP file.
+)
+cd packages\virtualbox
+..\..\7za a ..\..\CDROOT\COBALT\VBOX.ZIP *
 cd ..\..\
 
 :: check for files

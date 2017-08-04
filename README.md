@@ -5,13 +5,15 @@ Cobalt
 
 Cobalt is a new operating system based on FreeDOS, designed to be easy to use. Unlike FreeDOS, Cobalt is designed for users with no previous DOS experience. Cobalt uses the FreeDOS 1.1 kernel, ensuring 100% compatibility with DOS programs and games.
 
-Cobalt is still in development, so you might encounter bugs. It currently includes:
+Cobalt currently includes:
 
  * [4DOS 8.00](https://en.wikipedia.org/wiki/4DOS) command line
  * FAT12/16/32 file system support
  * Optional [OpenGEM desktop environment](http://www.opendawn.com/opengem/)
- * Silent boot
+ * Network/internet support ([more info](https://github.com/cobalt-os/cobalt/wiki/Networking-on-Cobalt))
+ * Full VirtualBox support with file transfer functionality ([more info](https://github.com/cobalt-os/cobalt/wiki/Networking-on-Cobalt))
  * Support for CD/DVD drives
+ * Built-in mouse driver
  * Support for [Long file names](https://en.wikipedia.org/wiki/Long_filename)
 
 If you have an existing computer (or virtual machine) with a DOS-based operating system, Cobalt will allow you to 'upgrade' over the existing OS and keep all your files.
