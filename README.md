@@ -1,4 +1,5 @@
-Cobalt
+# Cobalt is no longer under active development.
+
 ================
 ![Cobalt desktop](https://i.imgur.com/dyBXy5c.png)
 ================
