@@ -4,12 +4,12 @@ Cobalt is a new operating system based on FreeDOS, designed to be easy to use. U
 
 Cobalt is still in development, so you might encounter bugs. It currently includes:
 
- * [4DOS 8.00](https://en.wikipedia.org/wiki/4DOS) command line
+ * 4DOS 8.00 command shell
  * FAT12/16/32 file system support
- * Optional [graphical file manager](http://www.webring.org/l/rd?ring=freedos;id=14;url=http%3A%2F%2Ffdshell%2Esourceforge%2Enet%2F)
+ * Optional graphical file manager
  * Silent boot
  * Support for CD/DVD drives
- * Support for [Long file names](https://en.wikipedia.org/wiki/Long_filename)
+ * Support for long file names
 
 If you have an existing computer (or virtual machine) with a DOS-based operating system, Cobalt will allow you to 'upgrade' over the existing OS.
 
@@ -42,7 +42,7 @@ __New in Cobalt 1.2:__
 
 ---------------------------------------------------------
 
-Copyright 2017 Corbin Davenport
+Copyright (c) 2016-2018 Corbin Davenport, 2018 Ercan Ersoy
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
