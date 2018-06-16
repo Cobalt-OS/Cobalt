@@ -38,7 +38,6 @@ fi
 # compile
 
 echo "[ OK ] Now compiling..."
-echo -e "[ OK ] \c"
-"$MKISOFS" -quiet -o "$FILE" -p "$NAME" -publisher "$PUBLISHER" -V "$TITLE" -b ISOLINUX/ISOLINUX.BIN -no-emul-boot -boot-load-size 4 -boot-info-table -N -J -r -c boot.catalog -hide boot.catalog -hide-joliet boot.catalog CDROOT
+"$MKISOFS" -quiet -o "$FILE" -p "$NAME" -publisher "$PUBLISHER" -V "$TITLE" -b ISOLINUX/ISOLINUX.BIN -no-emul-boot -boot-load-size 4 -boot-info-table -c boot.cat CDROOT
 echo "[ OK ] Compile finished"
 exit 0
