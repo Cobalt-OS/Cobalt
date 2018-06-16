@@ -1,8 +1,4 @@
-# Cobalt is no longer under active development.
-
-================
-![Cobalt desktop](https://i.imgur.com/dyBXy5c.png)
-================
+# Cobalt
 
 Cobalt is a new operating system based on FreeDOS, designed to be easy to use. Unlike FreeDOS, Cobalt is designed for users with no previous DOS experience. Cobalt uses the FreeDOS 1.1 kernel, ensuring 100% compatibility with DOS programs and games.
 
