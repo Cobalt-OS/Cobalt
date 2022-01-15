@@ -1,4 +1,4 @@
-# Cobalt
+# Cobalt has moved to [another repository](https://github.com/corbindavenport/cobalt).
 
 Cobalt is a new operating system based on FreeDOS, designed to be easy to use. Unlike FreeDOS, Cobalt is designed for users with no previous DOS experience. Cobalt uses the FreeDOS 1.1 kernel, ensuring 100% compatibility with DOS programs and games.
 
@@ -41,8 +41,6 @@ __New in Cobalt 1.2:__
 * Now hides the AUTOEXEC and CONFIG files by default
 
 ---------------------------------------------------------
-
-Copyright (c) 2016-2018 Corbin Davenport
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
